@@ -9,9 +9,8 @@ struct App {
 
 impl eframe::App for App {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
-        let ctx = ui.ctx().clone();
-        popover::show(&ctx, &self.state);
-        ctx.request_repaint_after(std::time::Duration::from_millis(250));
+        popover::show(ui, &self.state);
+        ui.ctx().request_repaint_after(std::time::Duration::from_millis(250));
     }
 }
 

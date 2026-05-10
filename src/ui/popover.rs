@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use egui::{Color32, Context, Vec2};
+use egui::{Color32, Vec2};
 use parking_lot::RwLock;
 
 use crate::sample::{MemPressure, Sample};
@@ -15,9 +15,8 @@ pub struct PopoverState {
     pub settings: Settings,
 }
 
-#[allow(deprecated)]
-pub fn show(ctx: &Context, state: &PopoverState) {
-    egui::CentralPanel::default().show(ctx, |ui| {
+pub fn show(ui: &mut egui::Ui, state: &PopoverState) {
+    egui::CentralPanel::default().show_inside(ui, |ui| {
         ui.set_width(280.0);
         let store = state.store.read();
         let Some(latest) = store.latest().cloned() else {
