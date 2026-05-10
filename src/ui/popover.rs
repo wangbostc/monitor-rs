@@ -63,7 +63,7 @@ pub fn show(ui: &mut egui::Ui, state: &PopoverState) {
             ui.label(format!("swap {}", format_swap(&latest.swap)));
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 if ui.button("Quit").clicked() {
-                    std::process::exit(0);
+                    ui.ctx().send_viewport_cmd(egui::ViewportCommand::Close);
                 }
             });
         });

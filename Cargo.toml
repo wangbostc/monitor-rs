@@ -21,7 +21,6 @@ tracing-subscriber = { version = "0.3.23", features = ["env-filter", "fmt"] }
 core-foundation = "0.10.1"
 core-foundation-sys = "0.8.7"
 libloading = "0.9.0"
-mach2 = "0.6.0"
 objc2 = "0.6.4"
 objc2-app-kit = { version = "0.3.2", features = ["NSStatusBar", "NSStatusItem", "NSStatusBarButton", "NSApplication", "NSEvent", "NSWindow", "NSScreen", "NSImage", "NSButton", "NSControl", "NSResponder", "NSView", "objc2-core-foundation"] }
 objc2-foundation = { version = "0.3.2", features = ["NSString", "NSGeometry", "objc2-core-foundation"] }

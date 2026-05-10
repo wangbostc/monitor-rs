@@ -62,7 +62,7 @@ fn main() -> eframe::Result<()> {
     let settings = Settings::load();
     let handle = SamplerHandle::spawn(settings.clone());
     let store = handle.store.clone();
-    let visible = Arc::new(AtomicBool::new(true));
+    let visible = Arc::new(AtomicBool::new(false));
 
     let app = App {
         state: PopoverState { store, settings },
@@ -81,7 +81,8 @@ fn main() -> eframe::Result<()> {
             .with_title("monitor-rs")
             .with_decorations(false)
             .with_transparent(true)
-            .with_always_on_top(),
+            .with_always_on_top()
+            .with_visible(false),
         ..Default::default()
     };
 

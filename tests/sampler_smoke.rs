@@ -15,7 +15,7 @@ fn sampler_produces_samples() {
         let latest = s.latest().unwrap();
         assert!(latest.cpu_total >= 0.0 && latest.cpu_total <= 100.0);
         assert!(latest.mem.total_bytes > 0);
-        assert!(latest.cpu_per_core.len() >= 1);
+        assert!(!latest.cpu_per_core.is_empty());
     }
 
     handle.stop();
