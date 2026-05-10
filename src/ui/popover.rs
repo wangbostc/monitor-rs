@@ -60,21 +60,18 @@ pub fn show(ui: &mut egui::Ui, state: &PopoverState) {
 
         ui.separator();
         ui.label(format!("swap {}", format_swap(&latest.swap)));
-        ui.add_space(4.0);
-        ui.allocate_ui_with_layout(
-            egui::vec2(ui.available_width(), 0.0),
-            egui::Layout::right_to_left(egui::Align::Center),
-            |ui| {
-                if ui.button("Quit").clicked() {
-                    // LSUIElement apps don't terminate on last-window-close, and
-                    // ViewportCommand::Close just hides the borderless window —
-                    // process::exit is the reliable shutdown path. We accept the
-                    // skipped Drop impls (sampler thread is reaped by the OS,
-                    // log buffer may lose the last few lines).
-                    std::process::exit(0);
-                }
-            },
-        );
+        ui.add_space(6.0);
+        // Big, obvious, full-width Quit button. LSUIElement apps don't terminate
+        // on last-window-close, so process::exit is the reliable shutdown path
+        // (sampler thread is reaped by the OS; log buffer may lose the last few lines).
+        let quit = egui::Button::new(
+            egui::RichText::new("Quit monitor-rs").strong(),
+        )
+        .min_size(egui::vec2(ui.available_width(), 28.0))
+        .fill(egui::Color32::from_rgb(180, 60, 60));
+        if ui.add(quit).clicked() {
+            std::process::exit(0);
+        }
     });
 }
 
