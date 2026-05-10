@@ -101,6 +101,12 @@ struct Inner {
     _lib: Library,
 }
 
+// SAFETY: `Inner` is owned exclusively by a single `GpuSampler`. The CF refs and
+// function pointers it holds are never aliased across threads, and CoreFoundation
+// objects are safe to use from a single thread at a time. The sampler thread
+// will own the GpuSampler exclusively while ticking.
+unsafe impl Send for GpuSampler {}
+
 impl GpuSampler {
     pub fn new() -> Self {
         match unsafe { Self::try_init() } {
@@ -199,6 +205,8 @@ impl GpuSampler {
                 std::ptr::null(),
             );
             if subscription.is_null() || subbed.is_null() {
+                if !subscription.is_null() { CFRelease(subscription); }
+                if !subbed.is_null() { CFRelease(subbed as CFTypeRef); }
                 CFRelease(desired as CFTypeRef);
                 return Err(MetricError::Unavailable("subscription failed".into()));
             }
