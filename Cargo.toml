@@ -1,0 +1,27 @@
+[package]
+name = "monitor-rs"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow = "1.0.102"
+directories = "6.0.0"
+eframe = { version = "0.34.2", default-features = false, features = ["default_fonts", "glow", "wayland", "x11"] }
+egui = "0.34.2"
+parking_lot = "0.12.5"
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.149"
+sysinfo = "0.39.0"
+thiserror = "2.0.18"
+tracing = "0.1.44"
+tracing-appender = "0.2.5"
+tracing-subscriber = { version = "0.3.23", features = ["env-filter", "fmt"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+core-foundation = "0.10.1"
+core-foundation-sys = "0.8.7"
+libloading = "0.9.0"
+mach2 = "0.6.0"
+objc2 = "0.6.4"
+objc2-app-kit = { version = "0.3.2", features = ["NSStatusBar", "NSStatusItem", "NSStatusBarButton", "NSApplication", "NSEvent", "NSWindow", "NSScreen", "NSImage"] }
+objc2-foundation = { version = "0.3.2", features = ["NSString", "NSGeometry"] }

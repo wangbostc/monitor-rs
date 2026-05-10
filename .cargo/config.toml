@@ -1,0 +1,4 @@
+[build]
+# Faster incremental linking on macOS.
+[target.'cfg(target_os = "macos")']
+rustflags = ["-C", "link-arg=-fuse-ld=ld"]
