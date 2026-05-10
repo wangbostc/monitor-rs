@@ -25,7 +25,7 @@ The app is unsigned. On first launch macOS will block it — right-click the
 
 ## Configuration
 
-Settings live at `~/Library/Application Support/monitor-rs/config.json`:
+Settings live at `~/Library/Application Support/dev.monitor-rs.monitor-rs/config.json`:
 
 ```json
 {
