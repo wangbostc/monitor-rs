@@ -1,3 +1,4 @@
+pub mod format;
 pub mod logging;
 pub mod metrics;
 pub mod sample;
