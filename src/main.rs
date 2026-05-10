@@ -31,7 +31,7 @@ impl eframe::App for App {
             let visible = self.visible.clone();
             let ctx_clone = ctx.clone();
             let cb: Arc<dyn Fn() + Send + Sync> = Arc::new(move || {
-                let was = visible.fetch_xor(true, Ordering::SeqCst);
+                let was = visible.fetch_xor(true, Ordering::Relaxed);
                 let now_visible = !was;
                 ctx_clone.send_viewport_cmd(egui::ViewportCommand::Visible(now_visible));
             });

@@ -35,7 +35,8 @@ define_class!(
         // SAFETY: signature matches `- (void)click:(id)sender;`
         #[unsafe(method(click:))]
         fn click(&self, _sender: Option<&AnyObject>) {
-            (self.ivars())();
+            let cb = self.ivars().clone();
+            let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| cb()));
         }
     }
 );
@@ -59,14 +60,13 @@ impl Tray {
         let status_bar = NSStatusBar::systemStatusBar();
         let item = status_bar.statusItemWithLength(NSVariableStatusItemLength);
 
-        // Initial title so the bar entry is visible before the first sample arrives.
-        if let Some(button) = item.button(mtm) {
-            button.setTitle(&NSString::from_str("monitor-rs"));
-        }
-
         // Build a target/action pair that calls our Rust closure on click.
         let target = ClickTarget::new(on_click, mtm);
+
+        // Set up the button: initial title, target, and action.
         if let Some(button) = item.button(mtm) {
+            button.setTitle(&NSString::from_str("monitor-rs"));
+
             // SAFETY:
             // - target outlives the button (we hold it on Tray; setTarget is weak).
             // - the `click:` selector exists on ClickTarget and matches `@selector(click:)`.
