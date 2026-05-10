@@ -71,6 +71,8 @@ mod tests {
         let r = s.tick().expect("tick succeeds");
         assert!(r.mem.total_bytes > 0);
         assert!(r.mem.used_bytes <= r.mem.total_bytes);
-        assert!(r.swap.used_bytes <= r.swap.total_bytes.max(r.swap.used_bytes));
+        if r.swap.total_bytes > 0 {
+            assert!(r.swap.used_bytes <= r.swap.total_bytes);
+        }
     }
 }
