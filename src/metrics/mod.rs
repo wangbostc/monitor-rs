@@ -1,6 +1,8 @@
 use thiserror::Error;
 
 pub mod cpu;
+#[cfg(target_os = "macos")]
+pub mod gpu;
 pub mod mem;
 pub mod procs;
 
