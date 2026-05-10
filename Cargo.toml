@@ -25,3 +25,13 @@ mach2 = "0.6.0"
 objc2 = "0.6.4"
 objc2-app-kit = { version = "0.3.2", features = ["NSStatusBar", "NSStatusItem", "NSStatusBarButton", "NSApplication", "NSEvent", "NSWindow", "NSScreen", "NSImage", "NSButton", "NSControl", "NSResponder", "NSView", "objc2-core-foundation"] }
 objc2-foundation = { version = "0.3.2", features = ["NSString", "NSGeometry", "objc2-core-foundation"] }
+
+[package.metadata.bundle]
+name = "monitor-rs"
+identifier = "dev.monitor-rs"
+icon = []
+short_description = "Live CPU / GPU / memory monitor in the menu bar"
+long_description = "monitor-rs is a small Rust + egui menu bar app that shows live CPU, GPU, memory, and top processes on Apple Silicon Macs."
+osx_minimum_system_version = "12.0"
+
+osx_info_plist_exts = ["assets/lsuielement.plist"]
