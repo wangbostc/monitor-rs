@@ -63,7 +63,12 @@ pub fn show(ui: &mut egui::Ui, state: &PopoverState) {
             ui.label(format!("swap {}", format_swap(&latest.swap)));
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 if ui.button("Quit").clicked() {
-                    ui.ctx().send_viewport_cmd(egui::ViewportCommand::Close);
+                    // LSUIElement apps don't terminate on last-window-close, and
+                    // ViewportCommand::Close just hides the borderless window —
+                    // process::exit is the reliable shutdown path. We accept the
+                    // skipped Drop impls (sampler thread is reaped by the OS,
+                    // log buffer may lose the last few lines).
+                    std::process::exit(0);
                 }
             });
         });
