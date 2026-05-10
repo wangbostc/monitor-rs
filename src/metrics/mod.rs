@@ -1,6 +1,7 @@
 use thiserror::Error;
 
 pub mod cpu;
+pub mod mem;
 
 #[derive(Debug, Error)]
 pub enum MetricError {
