@@ -6,3 +6,4 @@ pub mod sample;
 pub mod sampler;
 pub mod settings;
 pub mod store;
+pub mod ui;
