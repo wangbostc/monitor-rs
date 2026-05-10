@@ -36,7 +36,13 @@ impl SamplerHandle {
         Self { store, stop, join: Some(join) }
     }
 
-    pub fn stop(mut self) {
+    pub fn stop(self) {
+        drop(self);
+    }
+}
+
+impl Drop for SamplerHandle {
+    fn drop(&mut self) {
         self.stop.store(true, std::sync::atomic::Ordering::SeqCst);
         if let Some(j) = self.join.take() {
             let _ = j.join();
@@ -67,6 +73,9 @@ fn run_loop(
             next = Instant::now();
         }
 
+        // CPU and memory are required: if they fail, skip this tick entirely.
+        // Processes and GPU are best-effort: partial samples (empty proc list,
+        // gpu_pct=None) are still useful, so we don't abort the tick on their failure.
         let cpu_r = match cpu.tick() {
             Ok(r) => r,
             Err(e) => { tracing::warn!("cpu tick: {e}"); continue; }
