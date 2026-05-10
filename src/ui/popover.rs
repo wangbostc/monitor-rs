@@ -59,9 +59,12 @@ pub fn show(ui: &mut egui::Ui, state: &PopoverState) {
         process_list(ui, &latest.top_procs);
 
         ui.separator();
-        ui.horizontal(|ui| {
-            ui.label(format!("swap {}", format_swap(&latest.swap)));
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+        ui.label(format!("swap {}", format_swap(&latest.swap)));
+        ui.add_space(4.0);
+        ui.allocate_ui_with_layout(
+            egui::vec2(ui.available_width(), 0.0),
+            egui::Layout::right_to_left(egui::Align::Center),
+            |ui| {
                 if ui.button("Quit").clicked() {
                     // LSUIElement apps don't terminate on last-window-close, and
                     // ViewportCommand::Close just hides the borderless window —
@@ -70,8 +73,8 @@ pub fn show(ui: &mut egui::Ui, state: &PopoverState) {
                     // log buffer may lose the last few lines).
                     std::process::exit(0);
                 }
-            });
-        });
+            },
+        );
     });
 }
 
