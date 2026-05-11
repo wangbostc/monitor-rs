@@ -4,6 +4,8 @@ pub mod cpu;
 #[cfg(target_os = "macos")]
 pub mod gpu;
 pub mod mem;
+#[cfg(target_os = "macos")]
+pub mod net;
 pub mod procs;
 
 #[derive(Debug, Error)]
