@@ -186,6 +186,7 @@ dependencies = [
  "core-foundation",
  "core-foundation-sys",
  "directories",
+ "libc",
  "libloading",
  "parking_lot",
  "serde",
