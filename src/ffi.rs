@@ -59,6 +59,12 @@ pub struct MrsSample {
     pub cpu_temp_c: f32,
     pub gpu_temp_present: u8,
     pub gpu_temp_c: f32,
+
+    // Top processes ranked by resident memory. Used by the popover when the
+    // hero metric is MEM; for every other hero the existing `procs` (CPU
+    // ranked) list is shown.
+    pub proc_count_by_mem: u8,
+    pub procs_by_mem: [MrsProcInfo; MRS_MAX_PROCS],
 }
 
 pub struct MrsHandle {
@@ -199,6 +205,24 @@ pub unsafe extern "C" fn monitor_rs_settings_set(h: *mut MrsHandle, json: *const
     r.unwrap_or(0)
 }
 
+/// Tell the sampler whether the popover is currently visible. When inactive,
+/// the sampler skips the expensive `sysinfo` process refresh and reuses the
+/// last-computed top-process lists. Pass non-zero for active, zero for
+/// inactive. Safe to call from any thread.
+///
+/// # Safety
+/// `h` must be a valid handle returned by `monitor_rs_start` and not yet freed.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn monitor_rs_set_active(h: *mut MrsHandle, active: u8) {
+    if h.is_null() {
+        return;
+    }
+    let _ = catch_unwind(AssertUnwindSafe(|| unsafe {
+        let handle = &*h;
+        handle.sampler.procs_active.store(active != 0, std::sync::atomic::Ordering::Relaxed);
+    }));
+}
+
 /// # Safety
 /// `s` must be a pointer previously returned by `monitor_rs_settings_get`, or null.
 /// After this call the pointer is invalid.
@@ -209,6 +233,22 @@ pub unsafe extern "C" fn monitor_rs_string_free(s: *const c_char) {
         // Reconstruct the CString to drop it.
         let _ = CString::from_raw(s as *mut c_char);
     }));
+}
+
+fn copy_procs(dst: &mut [MrsProcInfo; MRS_MAX_PROCS], src: &[crate::sample::ProcInfo]) {
+    let max_name = MRS_PROC_NAME - 1;
+    for (out, src) in dst.iter_mut().zip(src.iter()) {
+        out.pid = src.pid;
+        out.cpu_pct = src.cpu_pct;
+        out.rss_bytes = src.rss_bytes;
+        // Truncate name to NAME-1 bytes, NUL-terminate (the zero-init guarantees
+        // the trailing byte is already 0).
+        let bytes = src.name.as_bytes();
+        let n = bytes.len().min(max_name);
+        for (i, b) in bytes.iter().enumerate().take(n) {
+            out.name[i] = *b as c_char;
+        }
+    }
 }
 
 fn sample_to_c(s: &Sample, start: std::time::Instant) -> MrsSample {
@@ -237,23 +277,13 @@ fn sample_to_c(s: &Sample, start: std::time::Instant) -> MrsSample {
     out.swap_used_bytes = s.swap.used_bytes;
     out.swap_total_bytes = s.swap.total_bytes;
     out.proc_count = s.top_procs.len().min(MRS_MAX_PROCS) as u8;
+    out.proc_count_by_mem = s.top_procs_by_mem.len().min(MRS_MAX_PROCS) as u8;
 
     for (dst, src) in out.cpu_per_core_pct.iter_mut().zip(s.cpu_per_core.iter()) {
         *dst = *src;
     }
-    for (dst, src) in out.procs.iter_mut().zip(s.top_procs.iter()) {
-        dst.pid = src.pid;
-        dst.cpu_pct = src.cpu_pct;
-        dst.rss_bytes = src.rss_bytes;
-        // Truncate name to NAME-1 bytes, NUL-terminate (the zero-init guarantees
-        // the trailing byte is already 0).
-        let max = MRS_PROC_NAME - 1;
-        let bytes = src.name.as_bytes();
-        let n = bytes.len().min(max);
-        for (i, b) in bytes.iter().enumerate().take(n) {
-            dst.name[i] = *b as c_char;
-        }
-    }
+    copy_procs(&mut out.procs, &s.top_procs);
+    copy_procs(&mut out.procs_by_mem, &s.top_procs_by_mem);
 
     out.net_rx_bps = s.net.rx_bps;
     out.net_tx_bps = s.net.tx_bps;

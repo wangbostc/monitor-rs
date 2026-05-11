@@ -1,6 +1,7 @@
 #![cfg(target_os = "macos")]
 
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
 
@@ -16,7 +17,12 @@ use crate::store::SampleStore;
 
 pub struct SamplerHandle {
     pub store: Arc<RwLock<SampleStore>>,
-    stop: Arc<std::sync::atomic::AtomicBool>,
+    /// When set to `true` the sampler refreshes the (expensive) process
+    /// table each tick. When `false` it reuses the last result, since the
+    /// popover (the only consumer of that data) is not visible. Toggled
+    /// from the Swift side via `monitor_rs_set_active`.
+    pub procs_active: Arc<AtomicBool>,
+    stop: Arc<AtomicBool>,
     join: Option<JoinHandle<()>>,
 }
 
@@ -24,16 +30,18 @@ impl SamplerHandle {
     pub fn spawn(settings: Settings) -> Self {
         let cap = settings.history_capacity();
         let store = Arc::new(RwLock::new(SampleStore::new(cap)));
-        let stop = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let stop = Arc::new(AtomicBool::new(false));
+        let procs_active = Arc::new(AtomicBool::new(false));
 
         let store_w = store.clone();
         let stop_w = stop.clone();
+        let procs_active_w = procs_active.clone();
         let join = thread::Builder::new()
             .name("monitor-rs-sampler".into())
-            .spawn(move || run_loop(settings, store_w, stop_w))
+            .spawn(move || run_loop(settings, store_w, stop_w, procs_active_w))
             .expect("spawn sampler thread");
 
-        Self { store, stop, join: Some(join) }
+        Self { store, procs_active, stop, join: Some(join) }
     }
 
     pub fn stop(self) {
@@ -43,7 +51,7 @@ impl SamplerHandle {
 
 impl Drop for SamplerHandle {
     fn drop(&mut self) {
-        self.stop.store(true, std::sync::atomic::Ordering::SeqCst);
+        self.stop.store(true, Ordering::SeqCst);
         if let Some(j) = self.join.take() {
             let _ = j.join();
         }
@@ -53,7 +61,8 @@ impl Drop for SamplerHandle {
 fn run_loop(
     settings: Settings,
     store: Arc<RwLock<SampleStore>>,
-    stop: Arc<std::sync::atomic::AtomicBool>,
+    stop: Arc<AtomicBool>,
+    procs_active: Arc<AtomicBool>,
 ) {
     let mut cpu = CpuSampler::new();
     let mut mem = MemSampler::new();
@@ -62,12 +71,22 @@ fn run_loop(
     let mut net = crate::metrics::net::NetSampler::new();
     let mut disk = crate::metrics::disk::DiskSampler::new();
     let battery = crate::metrics::battery::BatterySampler::new();
-    let thermal = crate::metrics::thermal::ThermalSampler::new();
+    let mut thermal = crate::metrics::thermal::ThermalSampler::new();
 
     let interval = Duration::from_secs_f32(1.0 / settings.sample_rate_hz.max(0.1));
     let mut next = Instant::now();
 
-    while !stop.load(std::sync::atomic::Ordering::Relaxed) {
+    // Latest computed top-process lists. When `procs_active` is false we
+    // reuse these instead of paying for a full sysinfo refresh; the
+    // popover (the only consumer) isn't visible, so the freshness doesn't
+    // matter. When the popover next opens, Swift flips the flag and the
+    // following tick recomputes.
+    let mut last_top = crate::metrics::procs::TopProcs {
+        by_cpu: Vec::new(),
+        by_mem: Vec::new(),
+    };
+
+    while !stop.load(Ordering::Relaxed) {
         next += interval;
         let now = Instant::now();
         if now < next {
@@ -88,7 +107,11 @@ fn run_loop(
             Ok(r) => r,
             Err(e) => { tracing::warn!("mem tick: {e}"); continue; }
         };
-        let top = procs.tick().unwrap_or_default();
+        if procs_active.load(Ordering::Relaxed) {
+            if let Ok(top) = procs.tick() {
+                last_top = top;
+            }
+        }
         let gpu_pct = gpu.tick().ok().flatten();
         let net_io = net.tick();
         let disk_io = disk.tick();
@@ -102,7 +125,8 @@ fn run_loop(
             gpu_pct,
             mem: mem_r.mem,
             swap: mem_r.swap,
-            top_procs: top,
+            top_procs: last_top.by_cpu.clone(),
+            top_procs_by_mem: last_top.by_mem.clone(),
             net: net_io,
             disk: disk_io,
             battery: battery_info,

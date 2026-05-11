@@ -61,6 +61,8 @@ typedef struct {
   float cpu_temp_c;
   uint8_t gpu_temp_present;
   float gpu_temp_c;
+  uint8_t proc_count_by_mem;
+  MrsProcInfo procs_by_mem[MRS_MAX_PROCS];
 } MrsSample;
 #endif
 
@@ -116,6 +118,19 @@ const char *monitor_rs_settings_get(MrsHandle *h);
  * `json` must be a valid NUL-terminated UTF-8 string.
  */
 int monitor_rs_settings_set(MrsHandle *h, const char *json);
+#endif
+
+#if defined(__APPLE__)
+/**
+ * Tell the sampler whether the popover is currently visible. When inactive,
+ * the sampler skips the expensive `sysinfo` process refresh and reuses the
+ * last-computed top-process lists. Pass non-zero for active, zero for
+ * inactive. Safe to call from any thread.
+ *
+ * # Safety
+ * `h` must be a valid handle returned by `monitor_rs_start` and not yet freed.
+ */
+void monitor_rs_set_active(MrsHandle *h, uint8_t active);
 #endif
 
 #if defined(__APPLE__)

@@ -190,14 +190,50 @@ fn classify(name: &str) -> Option<Domain> {
     best.map(|(_, d)| d)
 }
 
-pub struct ThermalSampler;
+struct CachedService {
+    service: CFType,
+    domain: Domain,
+}
+
+/// Cached HID client + classified services. Discovering services and
+/// looking up their `Product` property is the most expensive part of a
+/// thermal tick (~30 ms on M-series). Sensor hardware doesn't change
+/// between ticks, so we do that work once on first use and refresh it
+/// periodically as insurance against hot-plug.
+struct Cache {
+    client: CFType,
+    services: Vec<CachedService>,
+}
+
+/// Re-discover the cached client + services every N ticks. At the default
+/// 1 Hz sample rate that's once a minute — well within the rate where a
+/// new external sensor would be noticed by anyone watching the popover.
+const REDISCOVER_EVERY_TICKS: u32 = 60;
+
+/// Re-read the (slow) IOHID temperature events every N ticks. Each read
+/// is one IPC roundtrip per sensor (~10–20 on M-series). Temperatures
+/// have thermal mass and change on a multi-second timescale, so 1 Hz
+/// resolution is overkill. 5 ticks = 5 s at the default 1 Hz.
+const READ_EVERY_TICKS: u32 = 5;
+
+pub struct ThermalSampler {
+    cache: Option<Cache>,
+    ticks_since_discovery: u32,
+    last_value: ThermalInfo,
+    ticks_since_read: u32,
+}
 
 impl ThermalSampler {
     pub fn new() -> Self {
-        Self
+        Self {
+            cache: None,
+            ticks_since_discovery: 0,
+            last_value: ThermalInfo::default(),
+            ticks_since_read: READ_EVERY_TICKS, // force a read on first tick
+        }
     }
 
-    pub fn tick(&self) -> ThermalInfo {
+    pub fn tick(&mut self) -> ThermalInfo {
         let Some(api) = hid() else {
             if WARN_LOGGED.set(()).is_ok() {
                 tracing::warn!(
@@ -206,7 +242,29 @@ impl ThermalSampler {
             }
             return ThermalInfo::default();
         };
-        unsafe { read_temps(api) }.unwrap_or_default()
+
+        // Cheap path on most ticks: reuse the previous reading.
+        self.ticks_since_read += 1;
+        if self.ticks_since_read < READ_EVERY_TICKS {
+            return self.last_value;
+        }
+        self.ticks_since_read = 0;
+
+        // Discover (or rediscover) services on first call and periodically
+        // afterwards. The rediscover budget is in ticks, not seconds, so
+        // the period scales with sample rate.
+        if self.cache.is_none() || self.ticks_since_discovery >= REDISCOVER_EVERY_TICKS {
+            self.cache = unsafe { build_cache(api) };
+            self.ticks_since_discovery = 0;
+        }
+        self.ticks_since_discovery += 1;
+
+        let Some(cache) = self.cache.as_ref() else {
+            self.last_value = ThermalInfo::default();
+            return self.last_value;
+        };
+        self.last_value = unsafe { read_temps_cached(api, cache) };
+        self.last_value
     }
 }
 
@@ -240,7 +298,10 @@ fn build_matching_dict() -> CFDictionary<CFString, CFType> {
     CFDictionary::from_CFType_pairs(&pairs)
 }
 
-unsafe fn read_temps(api: &Hid) -> Option<ThermalInfo> {
+/// Discover the HID client and pre-classify every matching temperature
+/// service. Done once per discovery cycle. The `Product` property lookup
+/// is the main per-tick cost we want to avoid on hot paths.
+unsafe fn build_cache(api: &Hid) -> Option<Cache> {
     let client = unsafe { (api.client_create)(std::ptr::null()) };
     if client.is_null() {
         return None;
@@ -261,20 +322,39 @@ unsafe fn read_temps(api: &Hid) -> Option<ThermalInfo> {
     }
     let services: CFArray<CFType> = unsafe { CFArray::wrap_under_create_rule(services_ref) };
 
-    let mut cpu_sum = 0.0f64;
-    let mut cpu_count = 0u32;
-    let mut gpu_sum = 0.0f64;
-    let mut gpu_count = 0u32;
-
+    let mut classified: Vec<CachedService> = Vec::new();
     for service in services.iter() {
         let Some(name) = (unsafe { service_product_name(api, service.as_CFTypeRef()) }) else {
             continue;
         };
         let Some(domain) = classify(&name) else { continue };
+        // `service` here is a CFType wrapped under-get-rule (the CFArray
+        // owns it); clone it so we hold our own retain that outlives the
+        // CFArray going out of scope.
+        classified.push(CachedService { service: service.clone(), domain });
+    }
 
+    Some(Cache { client: client_owned, services: classified })
+}
+
+/// Per-tick path: just fetch a temperature event from each already-classified
+/// service and average it into the right domain. No string allocation,
+/// no service enumeration, no property lookups.
+unsafe fn read_temps_cached(api: &Hid, cache: &Cache) -> ThermalInfo {
+    // Touch `cache.client` so the borrow-checker keeps the retain alive
+    // across the call; some IOHIDServiceClient functions implicitly
+    // depend on their owning client being alive.
+    let _ = &cache.client;
+
+    let mut cpu_sum = 0.0f64;
+    let mut cpu_count = 0u32;
+    let mut gpu_sum = 0.0f64;
+    let mut gpu_count = 0u32;
+
+    for entry in &cache.services {
         let event = unsafe {
             (api.service_copy_event)(
-                service.as_CFTypeRef(),
+                entry.service.as_concrete_TypeRef(),
                 K_IOHID_EVENT_TYPE_TEMPERATURE,
                 0,
                 0,
@@ -293,8 +373,7 @@ unsafe fn read_temps(api: &Hid) -> Option<ThermalInfo> {
         if !value.is_finite() || !(-20.0..=130.0).contains(&value) {
             continue;
         }
-
-        match domain {
+        match entry.domain {
             Domain::Cpu => {
                 cpu_sum += value;
                 cpu_count += 1;
@@ -306,7 +385,7 @@ unsafe fn read_temps(api: &Hid) -> Option<ThermalInfo> {
         }
     }
 
-    Some(ThermalInfo {
+    ThermalInfo {
         cpu_c: if cpu_count > 0 {
             Some((cpu_sum / cpu_count as f64) as f32)
         } else {
@@ -317,7 +396,7 @@ unsafe fn read_temps(api: &Hid) -> Option<ThermalInfo> {
         } else {
             None
         },
-    })
+    }
 }
 
 /// Enumerate every thermal sensor `IOHIDEventSystemClient` exposes and

@@ -15,9 +15,14 @@ demand.
 
 ## Non-goals
 
-- No changes to the Rust sampling core, the C ABI, or `MrsSample`. Every datum
-  the redesign renders is already exposed.
-- No changes to the menu bar status item; it keeps its 7-step rotation.
+- ~~No changes to the Rust sampling core, the C ABI, or `MrsSample`.~~ The
+  top-processes-by-sort-key feature added later (see "Sampler-side support"
+  below) required adding `procs_by_mem` / `proc_count_by_mem` fields to
+  `MrsSample` and a second sort pass in `ProcSampler.tick()`. The change is
+  strictly additive and does not perturb existing fields.
+- The menu bar status item keeps its 7-step rotation, but its pixel width is
+  now locked to the widest possible rotation entry (see "Status item width"
+  below) so the popover anchor doesn't drift each tick.
 - No settings sheet. The gear icon in the header stays as a disabled placeholder.
 - No new system permissions, no Dock icon, no window mode.
 
@@ -26,13 +31,33 @@ demand.
 1. **HeaderStrip** (existing) — wordmark + disabled gear + quit. Unchanged.
 2. **HeroCard** (new) — the currently-promoted metric, large.
 3. **PillsRow** (new) — the four non-hero metrics, each tappable to pin/unpin.
-4. **CoreGrid** (existing) — rendered *only when CPU is hero*. Otherwise omitted.
+4. **CoreGrid** (existing) — always rendered (see "Stability" below).
 5. **Top processes** (existing `ProcessList`, with section label) — unchanged.
 6. **FooterStrip** (existing) — `swap · battery · temps · sample rate`.
    Unchanged in v1; minor color polish if it falls out naturally.
 
-Width remains 300 pt. Height varies: ~340 pt with no core grid, ~380 pt with it.
-The popover is allowed to grow/shrink — NSPopover already handles that.
+Width remains 300 pt. Height is constant across hero swaps (the per-core grid
+is always present), so the popover's bottom edge doesn't shift as the hero
+rotates.
+
+### Stability
+
+Two visual jumpiness sources are explicitly fixed:
+
+- **Status item width**: `NSStatusItem.length` is locked to
+  `ceil(iconSlot + monospacedDigitWidth("NET ↓99.9 ↑99.9") + padding)`
+  using `NSFont.menuBarFont(ofSize: 0).pointSize` for the monospaced-digit
+  font. This is computed once at init. The status item button frame never
+  changes width, so the popover anchor X never moves.
+- **Popover height**: the per-core grid is rendered for every hero, not just
+  CPU. The cost is ~14 pt of vertical space when CPU isn't the hero; the
+  benefit is a popover whose bottom edge never jumps.
+
+### Status item width
+
+The button uses `NSFont.monospacedDigitSystemFont(ofSize:weight:)` at menu
+bar font size so digits don't shuffle horizontally as values tick within a
+single category (e.g., 42% → 43%).
 
 ## Hero promotion logic
 
@@ -126,14 +151,36 @@ mode. Memory pressure overrides the MEM hue, matching the existing
 
 ### Per-core grid
 
-- Rendered immediately below the hero card *only when hero is CPU*.
+- Rendered immediately below the pills row, **always** — for every hero, not
+  just CPU. This is what keeps the popover height stable across hero swaps
+  (see "Stability" above).
 - Same `CoreGrid` view that ships today; no changes.
 
 ### Top processes
 
-- Reused as-is: `Text("TOP PROCESSES")` label (caption, tracked, secondary)
-  followed by `ProcessList`.
-- A `Divider` precedes it; a `Divider` precedes the footer.
+- Heading and list reflect the current hero's sort key:
+  - **CPU / GPU / NET / DSK hero** → "TOP PROCESSES · BY CPU", entries from
+    `sample.topProcesses` (Rust-side sorted by `cpu_pct` desc).
+  - **MEM hero** → "TOP PROCESSES · BY MEM", entries from
+    `sample.topProcessesByMem` (Rust-side sorted by `rss_bytes` desc).
+- Why not per-metric sort for GPU / NET / DSK: macOS does not expose
+  per-process GPU / network / disk throughput through any public API.
+  `proc_pid_rusage` exposes disk bytes and network packet counts, but only
+  for processes owned by the calling user — system daemons like
+  WindowServer / kernel_task would show zero, which is more misleading than
+  falling back to the CPU-sorted list. The fallback is documented in the
+  heading label so the user sees what list they're looking at.
+- A `Divider` precedes the heading; a `Divider` precedes the footer.
+- `ProcessList` row layout is unchanged: name · cpu_pct · rss_bytes.
+
+### Sampler-side support
+
+The Rust `ProcSampler.tick()` returns a `TopProcs { by_cpu, by_mem }` struct.
+Both lists are derived from the same `refresh_processes` snapshot, each
+sorted and truncated independently to `top_n_procs`. The FFI surface gains
+`procs_by_mem: [MrsProcInfo; MRS_MAX_PROCS]` and `proc_count_by_mem: u8`
+alongside the existing `procs` / `proc_count` fields. This is additive on
+the C-struct level — `MrsSample` grows but no existing field shifts.
 
 ### Footer
 
@@ -231,19 +278,24 @@ pills → optional core grid → procs → footer. The current `summaryGrid` /
 
 ## Testing
 
-The redesign is mostly view code, but `HeroSelector` is pure logic and
-testable.
+The redesign is mostly view code, but `HeroSelector` is pure logic.
 
-- **Unit tests for `HeroSelector`** (new `Tests/HeroSelectorTests.swift`,
-  or wherever SwiftPM tests land for this target — currently there is no
-  test target, so we add one):
-  - Defaults to CPU on construction.
-  - Promotes a metric only after 5 ticks of ≥ 0.05 lead.
-  - Does not promote on a single-tick spike.
-  - Pin overrides auto-promotion.
-  - Unpin re-evaluates from the next sample.
-  - Voiceover-on extends hysteresis to 15 ticks.
-- **Smoke test (manual)**, added as bullets to the README checklist:
+A SwiftPM test target was originally planned, but the build environment
+on this machine (Command Line Tools only — no Xcode.app) makes it
+impractical: XCTest is bundled exclusively with Xcode.app, and while
+Swift Testing's `Testing.framework` ships with CLT it isn't on the
+default search path, and `swift test` insists on linking the executable
+target (whose Rust static lib needs OpenDirectory wired by the build
+script). Adding a test target meant brittle `-F` flags plus per-CI
+plumbing for marginal value on ~30 lines of logic. We dropped the
+target and verify `HeroSelector` via:
+
+- **Careful code review** of `HeroSelector.swift` — the logic is small,
+  clearly structured (pin check → threshold/argmax → hysteresis counter),
+  and behavior is documented in the doc comments and the spec sections
+  above (Hero promotion logic, Error / edge cases).
+- **Manual smoke test** (the README checklist), which exercises every
+  behavior end-to-end against the real sampler:
   - With nothing running, hero is CPU.
   - Running `yes > /dev/null` × N keeps CPU as hero (it's already #1).
   - Downloading 50 MB via curl swaps hero to NET within ~5 s.

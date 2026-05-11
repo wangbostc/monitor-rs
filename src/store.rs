@@ -56,6 +56,7 @@ mod tests {
             mem: MemInfo { used_bytes: 0, total_bytes: 1, pressure: MemPressure::Normal },
             swap: SwapInfo { used_bytes: 0, total_bytes: 0 },
             top_procs: vec![],
+            top_procs_by_mem: vec![],
             net: NetIo::default(),
             disk: DiskIo::default(),
             battery: BatteryInfo::default(),
