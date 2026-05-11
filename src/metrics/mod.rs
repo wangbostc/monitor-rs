@@ -8,6 +8,8 @@ pub mod mem;
 pub mod disk;
 #[cfg(target_os = "macos")]
 pub mod net;
+#[cfg(target_os = "macos")]
+pub mod battery;
 pub mod procs;
 
 #[derive(Debug, Error)]
