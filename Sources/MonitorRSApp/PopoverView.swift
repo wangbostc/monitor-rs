@@ -11,6 +11,7 @@ struct PopoverView: View {
 
             if let latest = model.latest {
                 summaryGrid(latest: latest)
+                ioGrid(latest: latest)
                 CoreGrid(perCoreUsage: latest.perCoreUsage)
                 Divider()
                 Text("TOP PROCESSES")
@@ -60,6 +61,37 @@ struct PopoverView: View {
                 history: normalize(model.memHistory)
             )
         }
+    }
+
+    @ViewBuilder
+    private func ioGrid(latest: MrsSample) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            MetricTile(
+                label: "NET",
+                value: formatIO(rx: latest.net_rx_bps, tx: latest.net_tx_bps),
+                color: .teal,
+                history: normalizeIO(model.netHistory)
+            )
+            MetricTile(
+                label: "DSK",
+                value: formatIO(rx: latest.disk_read_bps, tx: latest.disk_write_bps),
+                color: .purple,
+                history: normalizeIO(model.diskHistory)
+            )
+        }
+    }
+
+    private func formatIO(rx: UInt64, tx: UInt64) -> String {
+        let rxMB = Double(rx) / (1024.0 * 1024.0)
+        let txMB = Double(tx) / (1024.0 * 1024.0)
+        return String(format: "↓%.1f ↑%.1f", rxMB, txMB)
+    }
+
+    /// Auto-scale IO history into 0…1 against the max in the window
+    /// (with a floor of 1 MB/s so an idle window doesn't render full-scale noise).
+    private func normalizeIO(_ raw: [Float]) -> [Float] {
+        let peak = max(1.0, raw.max() ?? 0.0)
+        return raw.map { max(0, min(1, $0 / peak)) }
     }
 
     private func normalize(_ raw: [Float]) -> [Float] {
