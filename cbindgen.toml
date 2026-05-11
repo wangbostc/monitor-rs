@@ -10,7 +10,20 @@ style = "type"
 [export]
 prefix = ""
 include = ["MrsHandle", "MrsSample", "MrsProcInfo"]
-exclude = ["IOPSCopyPowerSourcesInfo", "IOPSCopyPowerSourcesList", "IOPSGetPowerSourceDescription"]
+exclude = [
+    "IOPSCopyPowerSourcesInfo",
+    "IOPSCopyPowerSourcesList",
+    "IOPSGetPowerSourceDescription",
+    # System Mach/IOKit symbols we declare extern for internal use only —
+    # these are provided by libSystem at link time and should not appear
+    # in our public C header.
+    "mach_host_self",
+    "host_statistics64",
+    "mach_port_t",
+    "kern_return_t",
+    "host_flavor_t",
+    "natural_t",
+]
 
 [export.rename]
 "c_char" = "char"
