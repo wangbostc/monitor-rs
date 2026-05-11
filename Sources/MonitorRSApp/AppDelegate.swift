@@ -5,6 +5,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         menuBarController = MenuBarController()
+        LoginItem.ensureRegistered()
     }
 
     func applicationWillTerminate(_ notification: Notification) {

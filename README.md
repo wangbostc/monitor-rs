@@ -14,8 +14,12 @@ Apple Silicon only. Rust sampling core + native SwiftUI popover.
 The script:
 1. `cargo build --release` → produces `libmonitor_rs.a` (Rust sampling core)
 2. `cbindgen --config cbindgen.toml --output include/monitor_rs.h` → regenerates the C header
-3. `swift build -c release` → compiles the SwiftPM `MonitorRSApp` executable
-4. Bundles the binary + `Info.plist` into `target/release/monitor-rs.app`
+3. Generates `Resources/icon/AppIcon.icns` from `Resources/icon/gen_icon.swift`
+   (SF-Symbol-based placeholder)
+4. `swift build -c release` → compiles the SwiftPM `MonitorRSApp` executable
+5. Bundles the binary + `Info.plist` + icon into `target/release/monitor-rs.app`
+6. Ad-hoc codesigns the bundle (`codesign --sign -`) so Gatekeeper doesn't
+   block it on this Mac
 
 Prerequisites: Rust 1.78+, Xcode Command Line Tools (Swift 5.10+),
 `cargo install cbindgen`.
@@ -25,14 +29,28 @@ Prerequisites: Rust 1.78+, Xcode Command Line Tools (Swift 5.10+),
 > `TABLE` constant in `src/metrics/thermal.rs` with the sensor names
 > printed there.
 
-## Run
+## Install
+
+```
+./install.sh
+```
+
+Copies the built `.app` to `/Applications/monitor-rs.app`. After installing,
+launch from Spotlight, Launchpad, or Finder → Applications by double-clicking.
+
+On first launch the app registers itself with `SMAppService` so it auto-starts
+at login. To turn that off, go to **System Settings → General → Login Items**
+and toggle "monitor-rs" off.
+
+## Run (from local build, without installing)
 
 ```
 open target/release/monitor-rs.app
 ```
 
-The app is unsigned. On first launch macOS will block it — right-click the
-`.app` in Finder and choose **Open** to authorize it.
+The ad-hoc signature is tied to this Mac. If you copy the bundle to another
+Mac it will be unsigned on that machine; right-click → **Open** the first
+time to authorize.
 
 ## Configuration
 
