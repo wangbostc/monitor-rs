@@ -81,19 +81,29 @@ After `./build.sh`, verify:
       `CPU N%` → `GPU N%` → `MEM N%` → `NET ↓X.X ↑Y.Y` → `DSK ↓X.X ↑Y.Y`
       → `BAT N%[⚡]` → `TMP N°C`.
 - [ ] Clicking the status item shows a translucent popover anchored beneath it.
-- [ ] Popover row 1 shows three summary tiles (CPU / GPU / MEM) with
-      sparklines and a per-core grid under the CPU tile.
-- [ ] Popover row 2 shows two tiles (NET / DSK) with sparklines that
-      auto-scale to the recent peak.
+- [ ] Popover shows ONE large tinted hero card (CPU by default — green) with
+      a big percentage, a meta line (`N-core · hot core M%`), and an area
+      sparkline on the right.
+- [ ] Below the hero, four pills (GPU / MEM / NET / DSK) show their
+      current values.
+- [ ] Per-core grid appears only when CPU is the hero, directly below the
+      pills.
+- [ ] Tapping a pill pins that metric as the new hero with a brief
+      fade-in. A small filled dot appears next to its label.
+- [ ] Tapping the pinned hero unpins it; auto-promotion resumes.
 - [ ] Top processes section updates live.
-- [ ] CPU sparkline rises when running `yes > /dev/null` × N.
+- [ ] Running `yes > /dev/null` × N keeps CPU as the hero (already #1).
 - [ ] Per-core grid lights up redder with load.
-- [ ] GPU sparkline rises under a Metal compute load — or shows `n/a` if
-      IOReport binding is unavailable.
-- [ ] Network rate rises when downloading:
-      `curl -o /dev/null https://speed.cloudflare.com/__down\?bytes\=20000000`.
-- [ ] Disk rate rises when writing:
-      `dd if=/dev/zero of=/tmp/iotest bs=1m count=500 && rm /tmp/iotest`.
+- [ ] GPU hero shows `n/a` / `Metal idle` if IOReport binding is unavailable;
+      otherwise pinning GPU shows a live percentage.
+- [ ] Downloading swaps the hero to NET within ~5 s of sustained transfer
+      (`curl -o /dev/null https://speed.cloudflare.com/__down\?bytes\=200000000`);
+      ending the transfer returns the hero to CPU after the matching window.
+- [ ] Sustained writes swap the hero to DSK
+      (`dd if=/dev/zero of=/tmp/iotest bs=1m count=2000 && rm /tmp/iotest`);
+      finishing returns it to CPU.
+- [ ] With macOS "Reduce motion" enabled (System Settings → Accessibility
+      → Display → Reduce motion), hero swaps happen with no animation.
 - [ ] Footer shows `🔋 N% [⚡]` when on a laptop; bolt drops when unplugged;
       battery chip is hidden entirely on a desktop.
 - [ ] Footer shows `🌡 CPU N° GPU N°` (M-series only); under sustained CPU
@@ -105,13 +115,19 @@ After `./build.sh`, verify:
 
 ## Architecture
 
-See `docs/superpowers/specs/2026-05-11-swiftui-popover-redesign.md`.
+See `docs/superpowers/specs/2026-05-11-popover-hero-redesign-design.md`
+(supersedes the original popover spec for the UI layer; the original
+`2026-05-11-swiftui-popover-redesign.md` still documents the
+Rust/FFI/sampling architecture).
 
 ## Repository layout
 
 ```
 src/                # Rust sampling core (library only)
-Sources/            # SwiftPM targets: MonitorRSC (C bindings) + MonitorRSApp
+Sources/            # SwiftPM targets:
+                    #   MonitorRSC    - C bindings (cbindgen header)
+                    #   MonitorRSLogic - pure-Swift logic (MetricKind, HeroSelector)
+                    #   MonitorRSApp  - SwiftUI executable
 include/            # cbindgen-generated C header (committed)
 Resources/          # Info.plist for the .app
 build.sh            # End-to-end build script

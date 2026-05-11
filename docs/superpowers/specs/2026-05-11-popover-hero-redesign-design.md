@@ -231,19 +231,24 @@ pills → optional core grid → procs → footer. The current `summaryGrid` /
 
 ## Testing
 
-The redesign is mostly view code, but `HeroSelector` is pure logic and
-testable.
+The redesign is mostly view code, but `HeroSelector` is pure logic.
 
-- **Unit tests for `HeroSelector`** (new `Tests/HeroSelectorTests.swift`,
-  or wherever SwiftPM tests land for this target — currently there is no
-  test target, so we add one):
-  - Defaults to CPU on construction.
-  - Promotes a metric only after 5 ticks of ≥ 0.05 lead.
-  - Does not promote on a single-tick spike.
-  - Pin overrides auto-promotion.
-  - Unpin re-evaluates from the next sample.
-  - Voiceover-on extends hysteresis to 15 ticks.
-- **Smoke test (manual)**, added as bullets to the README checklist:
+A SwiftPM test target was originally planned, but the build environment
+on this machine (Command Line Tools only — no Xcode.app) makes it
+impractical: XCTest is bundled exclusively with Xcode.app, and while
+Swift Testing's `Testing.framework` ships with CLT it isn't on the
+default search path, and `swift test` insists on linking the executable
+target (whose Rust static lib needs OpenDirectory wired by the build
+script). Adding a test target meant brittle `-F` flags plus per-CI
+plumbing for marginal value on ~30 lines of logic. We dropped the
+target and verify `HeroSelector` via:
+
+- **Careful code review** of `HeroSelector.swift` — the logic is small,
+  clearly structured (pin check → threshold/argmax → hysteresis counter),
+  and behavior is documented in the doc comments and the spec sections
+  above (Hero promotion logic, Error / edge cases).
+- **Manual smoke test** (the README checklist), which exercises every
+  behavior end-to-end against the real sampler:
   - With nothing running, hero is CPU.
   - Running `yes > /dev/null` × N keeps CPU as hero (it's already #1).
   - Downloading 50 MB via curl swaps hero to NET within ~5 s.
