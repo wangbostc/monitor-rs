@@ -70,20 +70,20 @@ fn parse_battery_dict(dict: &CFDictionary<CFString, CFType>) -> Option<BatteryIn
 }
 
 fn get_string(dict: &CFDictionary<CFString, CFType>, key: &str) -> Option<String> {
-    let v = dict.find(&CFString::new(key))?;
+    let v = dict.find(CFString::new(key))?;
     let s: CFString = v.downcast::<CFString>()?;
     Some(s.to_string())
 }
 
 fn get_i64(dict: &CFDictionary<CFString, CFType>, key: &str) -> Option<i64> {
-    let v = dict.find(&CFString::new(key))?;
+    let v = dict.find(CFString::new(key))?;
     let n: CFNumber = v.downcast::<CFNumber>()?;
     n.to_i64()
 }
 
 fn get_bool(dict: &CFDictionary<CFString, CFType>, key: &str) -> Option<bool> {
     use core_foundation::boolean::CFBoolean;
-    let v = dict.find(&CFString::new(key))?;
+    let v = dict.find(CFString::new(key))?;
     let b: CFBoolean = v.downcast::<CFBoolean>()?;
     Some(b.into())
 }

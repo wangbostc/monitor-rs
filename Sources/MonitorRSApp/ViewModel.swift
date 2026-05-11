@@ -25,7 +25,7 @@ extension MonitorViewModel {
     /// Combined network throughput (rx + tx) in MB/s, oldest first.
     var netHistory: [Float] {
         recent.map { s in
-            let total = Float(s.net_rx_bps &+ s.net_tx_bps) / Float(1024 * 1024)
+            let total = Float(s.net_rx_bps + s.net_tx_bps) / Float(1024 * 1024)
             return total
         }
     }
@@ -33,7 +33,7 @@ extension MonitorViewModel {
     /// Combined disk throughput (read + write) in MB/s, oldest first.
     var diskHistory: [Float] {
         recent.map { s in
-            let total = Float(s.disk_read_bps &+ s.disk_write_bps) / Float(1024 * 1024)
+            let total = Float(s.disk_read_bps + s.disk_write_bps) / Float(1024 * 1024)
             return total
         }
     }

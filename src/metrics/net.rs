@@ -53,11 +53,11 @@ impl NetSampler {
     /// Returns the current rx/tx rates in bytes per second. The first call
     /// after construction always returns zero (no prior snapshot to delta against).
     pub fn tick(&mut self) -> NetIo {
-        // Use refresh(false) to update counters without re-enumerating interfaces.
-        // refresh(true) drops and re-adds interface entries on each call, which
-        // resets total_received()/total_transmitted() to zero and causes rate_bps
-        // to always compute a near-zero delta. refresh(false) preserves the
-        // cumulative totals across ticks so the delta correctly reflects real traffic.
+        // refresh(false): update the counter values on existing interfaces
+        // without re-running the address/operational-state enumeration. The
+        // re-enumeration variant (refresh(true)) was observed empirically to
+        // yield near-zero deltas across consecutive ticks even under a saturated
+        // download — keep this on `false`.
         self.nets.refresh(false);
         let mut rx_total: u64 = 0;
         let mut tx_total: u64 = 0;

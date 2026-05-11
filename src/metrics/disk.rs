@@ -32,7 +32,9 @@ impl DiskSampler {
     }
 
     pub fn tick(&mut self) -> DiskIo {
-        self.disks.refresh(true);
+        // refresh(false) for symmetry with NetSampler — we only need updated
+        // counters, not re-enumeration of mounted volumes.
+        self.disks.refresh(false);
         let mut read_total: u64 = 0;
         let mut write_total: u64 = 0;
         for d in self.disks.iter() {

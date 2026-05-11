@@ -40,6 +40,8 @@ type IOHIDServiceClientCopyPropertyFn =
 type IOHIDEventGetFloatValueFn = unsafe extern "C" fn(event: CFTypeRef, field: i64) -> f64;
 
 const K_IOHID_EVENT_TYPE_TEMPERATURE: i64 = 15;
+// IOHIDEventFieldBase(kIOHIDEventTypeTemperature) | 0 — the "level" field of a
+// temperature event. The base is (event_type << 16); field index 0 is the value.
 const K_IOHID_EVENT_FIELD_TEMP_LEVEL: i64 = K_IOHID_EVENT_TYPE_TEMPERATURE << 16;
 // "PrimaryUsage" page=0xff00, usage=0x0005 selects thermal sensors.
 const K_HID_PAGE_APPLE_VENDOR: i64 = 0xff00;
