@@ -1,0 +1,6 @@
+/target
+/.superpowers
+/.DS_Store
+*.app
+/rust_out
+/.build
