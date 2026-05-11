@@ -23,7 +23,12 @@ struct PopoverView: View {
                 FooterStrip(
                     swapUsedBytes: latest.swap_used_bytes,
                     swapTotalBytes: latest.swap_total_bytes,
-                    sampleRateHz: 1.0  // Settings UI is v1.5 scope; reading from the bridge later.
+                    sampleRateHz: 1.0,
+                    batteryPresent: latest.battery_present == 1,
+                    batteryPct: latest.battery_pct,
+                    batteryCharging: latest.battery_charging == 1,
+                    cpuTempC: latest.cpu_temp_present == 1 ? latest.cpu_temp_c : nil,
+                    gpuTempC: latest.gpu_temp_present == 1 ? latest.gpu_temp_c : nil
                 )
             } else {
                 VStack {
