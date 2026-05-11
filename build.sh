@@ -52,6 +52,12 @@ cp "Resources/Info.plist" "$APP_DIR/Contents/Info.plist"
 cp "$ICON_ICNS" "$APP_DIR/Contents/Resources/AppIcon.icns"
 echo "APPL????" > "$APP_DIR/Contents/PkgInfo"
 
+echo "==> Ad-hoc codesigning..."
+codesign --force --deep --sign - --options runtime "$APP_DIR"
+
+echo "==> Verifying signature..."
+codesign --verify --deep --strict "$APP_DIR"
+
 echo "==> Done."
 echo "Bundle: $APP_DIR"
 ls -la "$APP_DIR/Contents/MacOS/" "$APP_DIR/Contents/Resources/"
