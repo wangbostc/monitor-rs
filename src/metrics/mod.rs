@@ -10,6 +10,8 @@ pub mod disk;
 pub mod net;
 #[cfg(target_os = "macos")]
 pub mod battery;
+#[cfg(target_os = "macos")]
+pub mod thermal;
 pub mod procs;
 
 #[derive(Debug, Error)]

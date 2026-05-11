@@ -7,3 +7,9 @@ pub mod sample;
 pub mod sampler;
 pub mod settings;
 pub mod store;
+
+#[cfg(target_os = "macos")]
+#[doc(hidden)]
+pub fn __example_dump_thermal_sensors() {
+    crate::metrics::thermal::dump_all();
+}
