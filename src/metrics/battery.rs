@@ -1,13 +1,11 @@
 //! Battery information via the IOKit power-sources API.
 //! Public API only — no private framework calls.
 
-use std::ffi::c_void;
-
 use core_foundation::array::{CFArray, CFArrayRef};
 use core_foundation::base::{CFType, CFTypeRef, TCFType};
 use core_foundation::dictionary::{CFDictionary, CFDictionaryRef};
-use core_foundation::number::{CFNumber, CFNumberRef};
-use core_foundation::string::{CFString, CFStringRef};
+use core_foundation::number::CFNumber;
+use core_foundation::string::CFString;
 
 use crate::sample::BatteryInfo;
 
