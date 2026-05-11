@@ -1,3 +1,4 @@
+#![allow(deprecated)]
 use std::path::PathBuf;
 use std::{fs, io};
 
@@ -6,6 +7,9 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Settings {
     pub sample_rate_hz: f32,
+    /// Deprecated: status item formatting is owned by the Swift side as of v0.2.
+    /// Kept in the schema so old config.json files still parse.
+    #[deprecated(note = "Swift owns status item formatting; this field is ignored.")]
     pub menu_bar_format: String,
     pub top_n_procs: usize,
     pub history_seconds: u32,

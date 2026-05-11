@@ -1,6 +1,5 @@
 #[cfg(target_os = "macos")]
 pub mod ffi;
-pub mod format;
 pub mod logging;
 pub mod metrics;
 pub mod sample;
@@ -8,4 +7,3 @@ pub mod sample;
 pub mod sampler;
 pub mod settings;
 pub mod store;
-pub mod ui;
