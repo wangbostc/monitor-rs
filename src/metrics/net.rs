@@ -19,9 +19,27 @@ pub(crate) fn rate_bps(prev: u64, current: u64, dt: Duration) -> u64 {
     ((delta as f64) / secs).round() as u64
 }
 
+/// Returns true if `name` looks like a macOS pseudo-interface that does
+/// not carry real off-host traffic (loopback, VPN tunnels, AirDrop, etc.).
+fn is_pseudo_interface(name: &str) -> bool {
+    name == "lo0"
+        || name == "stf0"
+        || name.starts_with("utun")
+        || name.starts_with("llw")
+        || name.starts_with("awdl")
+        || name.starts_with("anpi")
+        || name.starts_with("bridge")
+        || name.starts_with("gif")
+        || name.starts_with("ipsec")
+}
+
 pub struct NetSampler {
     nets: Networks,
     last: Option<(u64, u64, Instant)>,  // (rx_total, tx_total, ts)
+}
+
+impl Default for NetSampler {
+    fn default() -> Self { Self::new() }
 }
 
 impl NetSampler {
@@ -39,8 +57,7 @@ impl NetSampler {
         let mut rx_total: u64 = 0;
         let mut tx_total: u64 = 0;
         for (name, data) in self.nets.iter() {
-            // Skip loopback so the rate reflects real off-host traffic.
-            if name == "lo0" || name.starts_with("utun") { continue; }
+            if is_pseudo_interface(name) { continue; }
             rx_total = rx_total.saturating_add(data.total_received());
             tx_total = tx_total.saturating_add(data.total_transmitted());
         }
@@ -84,5 +101,13 @@ mod tests {
         // 1 MB in 200 ms ⇒ 5 MB/s
         let r = rate_bps(0, 1_000_000, Duration::from_millis(200));
         assert_eq!(r, 5_000_000);
+    }
+
+    #[test]
+    fn first_tick_returns_zero() {
+        let mut s = NetSampler::new();
+        let r = s.tick();
+        assert_eq!(r.rx_bps, 0);
+        assert_eq!(r.tx_bps, 0);
     }
 }
