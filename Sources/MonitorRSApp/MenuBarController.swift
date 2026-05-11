@@ -69,20 +69,31 @@ final class MenuBarController {
         viewModel.recent = recent
 
         if let s = latest {
-            statusItem.button?.title = MenuBarController.formatStatus(s)
+            let index = Int(Date().timeIntervalSinceReferenceDate / Self.rotationPeriodSeconds) % 3
+            statusItem.button?.title = MenuBarController.formatStatus(s, index: index)
         }
     }
 
-    /// Compact status text shown alongside the gauge icon.
-    /// Format: "CPU% GPU% MEM%" — em-dash for GPU None.
-    static func formatStatus(_ s: MrsSample) -> String {
-        let cpu = Int(s.cpu_total_pct.rounded())
-        let gpu: String = s.gpu_present == 1 ? "\(Int(s.gpu_pct.rounded()))" : "—"
-        let memPct: Int = {
-            guard s.mem_total_bytes > 0 else { return 0 }
-            return Int((Double(s.mem_used_bytes) / Double(s.mem_total_bytes) * 100.0).rounded())
-        }()
-        return "\(cpu) \(gpu) \(memPct)"
+    /// Seconds each metric is shown before rotating to the next.
+    private static let rotationPeriodSeconds: TimeInterval = 2.0
+
+    /// Compact status text shown alongside the gauge icon. Rotates through
+    /// CPU / GPU / MEM so the item stays narrow enough to fit right of the
+    /// camera notch on notched MacBook Pros.
+    static func formatStatus(_ s: MrsSample, index: Int) -> String {
+        switch index % 3 {
+        case 0:
+            return "CPU \(Int(s.cpu_total_pct.rounded()))%"
+        case 1:
+            return s.gpu_present == 1
+                ? "GPU \(Int(s.gpu_pct.rounded()))%"
+                : "GPU —"
+        default:
+            let memPct = s.mem_total_bytes > 0
+                ? Int((Double(s.mem_used_bytes) / Double(s.mem_total_bytes) * 100.0).rounded())
+                : 0
+            return "MEM \(memPct)%"
+        }
     }
 
     /// Write a startup line to the rolling log so we can confirm the menu-bar
