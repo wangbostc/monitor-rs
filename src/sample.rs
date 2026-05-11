@@ -28,6 +28,31 @@ pub struct ProcInfo {
     pub rss_bytes: u64,
 }
 
+#[derive(Debug, Clone, Copy, Default)]
+pub struct NetIo {
+    pub rx_bps: u64,
+    pub tx_bps: u64,
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+pub struct DiskIo {
+    pub read_bps: u64,
+    pub write_bps: u64,
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+pub struct BatteryInfo {
+    pub present: bool,
+    pub is_charging: bool,
+    pub percent: f32,
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+pub struct ThermalInfo {
+    pub cpu_c: Option<f32>,
+    pub gpu_c: Option<f32>,
+}
+
 #[derive(Debug, Clone)]
 pub struct Sample {
     pub ts: Instant,
@@ -37,6 +62,10 @@ pub struct Sample {
     pub mem: MemInfo,
     pub swap: SwapInfo,
     pub top_procs: Vec<ProcInfo>,
+    pub net: NetIo,
+    pub disk: DiskIo,
+    pub battery: BatteryInfo,
+    pub thermal: ThermalInfo,
 }
 
 impl MemInfo {

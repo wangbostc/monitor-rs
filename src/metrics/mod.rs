@@ -4,6 +4,14 @@ pub mod cpu;
 #[cfg(target_os = "macos")]
 pub mod gpu;
 pub mod mem;
+#[cfg(target_os = "macos")]
+pub mod disk;
+#[cfg(target_os = "macos")]
+pub mod net;
+#[cfg(target_os = "macos")]
+pub mod battery;
+#[cfg(target_os = "macos")]
+pub mod thermal;
 pub mod procs;
 
 #[derive(Debug, Error)]

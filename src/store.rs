@@ -44,7 +44,7 @@ impl SampleStore {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::sample::{MemInfo, MemPressure, SwapInfo};
+    use crate::sample::{MemInfo, MemPressure, SwapInfo, NetIo, DiskIo, BatteryInfo, ThermalInfo};
     use std::time::Instant;
 
     fn dummy_sample(cpu: f32) -> Sample {
@@ -56,6 +56,10 @@ mod tests {
             mem: MemInfo { used_bytes: 0, total_bytes: 1, pressure: MemPressure::Normal },
             swap: SwapInfo { used_bytes: 0, total_bytes: 0 },
             top_procs: vec![],
+            net: NetIo::default(),
+            disk: DiskIo::default(),
+            battery: BatteryInfo::default(),
+            thermal: ThermalInfo::default(),
         }
     }
 

@@ -46,6 +46,19 @@ pub struct MrsSample {
     pub swap_total_bytes: u64,
     pub proc_count: u8,
     pub procs: [MrsProcInfo; MRS_MAX_PROCS],
+
+    // ----- new fields (additive only) -----
+    pub net_rx_bps: u64,
+    pub net_tx_bps: u64,
+    pub disk_read_bps: u64,
+    pub disk_write_bps: u64,
+    pub battery_present: u8,
+    pub battery_charging: u8,
+    pub battery_pct: f32,
+    pub cpu_temp_present: u8,
+    pub cpu_temp_c: f32,
+    pub gpu_temp_present: u8,
+    pub gpu_temp_c: f32,
 }
 
 pub struct MrsHandle {
@@ -242,6 +255,18 @@ fn sample_to_c(s: &Sample, start: std::time::Instant) -> MrsSample {
         }
     }
 
+    out.net_rx_bps = s.net.rx_bps;
+    out.net_tx_bps = s.net.tx_bps;
+    out.disk_read_bps = s.disk.read_bps;
+    out.disk_write_bps = s.disk.write_bps;
+    out.battery_present = if s.battery.present { 1 } else { 0 };
+    out.battery_charging = if s.battery.is_charging { 1 } else { 0 };
+    out.battery_pct = s.battery.percent;
+    out.cpu_temp_present = if s.thermal.cpu_c.is_some() { 1 } else { 0 };
+    out.cpu_temp_c = s.thermal.cpu_c.unwrap_or(0.0);
+    out.gpu_temp_present = if s.thermal.gpu_c.is_some() { 1 } else { 0 };
+    out.gpu_temp_c = s.thermal.gpu_c.unwrap_or(0.0);
+
     out
 }
 
@@ -266,6 +291,39 @@ mod tests {
         assert!(out.core_count >= 1);
         assert!(out.mem_total_bytes > 0);
 
+        unsafe { monitor_rs_stop(h) };
+    }
+
+    #[test]
+    fn start_latest_yields_plausible_new_metrics() {
+        let h = monitor_rs_start();
+        assert!(!h.is_null());
+        std::thread::sleep(std::time::Duration::from_millis(2500));
+
+        let mut sample: MrsSample = unsafe { std::mem::zeroed() };
+        let ok = unsafe { monitor_rs_latest(h, &mut sample) };
+        assert_eq!(ok, 1);
+
+        // Net/disk are non-negative by construction (u64).
+        // Battery percent (when present) is bounded.
+        if sample.battery_present == 1 {
+            assert!(
+                sample.battery_pct >= 0.0 && sample.battery_pct <= 100.0,
+                "battery_pct out of range: {}", sample.battery_pct,
+            );
+        }
+        if sample.cpu_temp_present == 1 {
+            assert!(
+                sample.cpu_temp_c > 0.0 && sample.cpu_temp_c < 130.0,
+                "cpu_temp_c implausible: {}", sample.cpu_temp_c,
+            );
+        }
+        if sample.gpu_temp_present == 1 {
+            assert!(
+                sample.gpu_temp_c > 0.0 && sample.gpu_temp_c < 130.0,
+                "gpu_temp_c implausible: {}", sample.gpu_temp_c,
+            );
+        }
         unsafe { monitor_rs_stop(h) };
     }
 
