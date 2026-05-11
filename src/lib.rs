@@ -1,3 +1,5 @@
+#[cfg(target_os = "macos")]
+pub mod ffi;
 pub mod format;
 pub mod logging;
 pub mod metrics;
