@@ -3,7 +3,7 @@ import SwiftUI
 import MonitorRSC
 
 @MainActor
-final class MenuBarController {
+final class MenuBarController: NSObject, NSPopoverDelegate {
     private let statusItem: NSStatusItem
     private let popover: NSPopover
     private let bridge: RustBridge?
@@ -22,7 +22,7 @@ final class MenuBarController {
     private static let hotRefreshIntervalSeconds: TimeInterval = 0.25
     private static let idleRefreshIntervalSeconds: TimeInterval = 1.0
 
-    init() {
+    override init() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         bridge = RustBridge()
 
@@ -30,11 +30,15 @@ final class MenuBarController {
         popover.contentSize = NSSize(width: 300, height: 360)
         popover.behavior = .transient
         popover.animates = true
-        popover.contentViewController = NSHostingController(
-            rootView: PopoverView(model: viewModel, onQuit: {
-                NSApp.terminate(nil)
-            })
-        )
+
+        super.init()
+
+        // Content controller is built lazily on first open and torn down
+        // on close via `popoverDidClose` so SwiftUI doesn't hold the view
+        // tree, AttributeGraph, and backing layers while the popover isn't
+        // visible. The delegate catches both our toggle-driven closes and
+        // user dismissals (click outside).
+        popover.delegate = self
 
         if let button = statusItem.button {
             // SF Symbol icon stays visible even when menu bar is crowded
@@ -67,20 +71,39 @@ final class MenuBarController {
     @objc private func togglePopover(_ sender: NSStatusBarButton) {
         if popover.isShown {
             popover.performClose(sender)
-            // Drop the loop back to idle cadence; sparklines aren't visible.
-            restartRefreshLoop(interval: Self.idleRefreshIntervalSeconds)
-            // Tell the Rust sampler it can skip the expensive process
-            // refresh until we open again.
-            bridge?.setActive(false)
         } else {
             // Kick the sampler back into full-fidelity mode *before* showing
             // the popover so the first tick after open is fresh.
             bridge?.setActive(true)
+            popover.contentViewController = NSHostingController(
+                rootView: PopoverView(model: viewModel, onQuit: {
+                    NSApp.terminate(nil)
+                })
+            )
             popover.show(relativeTo: sender.bounds, of: sender, preferredEdge: .minY)
             popover.contentViewController?.view.window?.makeKey()
             restartRefreshLoop(interval: Self.hotRefreshIntervalSeconds)
             refreshTick()
         }
+    }
+
+    // MARK: - NSPopoverDelegate
+
+    /// Fired once the close animation finishes — for both user dismissal
+    /// (click outside / .transient behavior) and our programmatic close.
+    /// Tearing down the hosting controller here is the single place that
+    /// releases SwiftUI's view tree, AttributeGraph state, and CoreAnimation
+    /// backing layers; without it, opening the popover once permanently
+    /// inflates the process's phys_footprint by ~100 MB.
+    func popoverDidClose(_ notification: Notification) {
+        // Idle cadence — sparklines aren't visible.
+        restartRefreshLoop(interval: Self.idleRefreshIntervalSeconds)
+        // Tell the Rust sampler it can skip the expensive process refresh
+        // until we open again.
+        bridge?.setActive(false)
+        // Drop the SwiftUI view tree and the in-memory sample history.
+        popover.contentViewController = nil
+        viewModel.recent = []
     }
 
     private func startRefreshLoop() {
