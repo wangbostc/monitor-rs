@@ -20,6 +20,11 @@ The script:
 Prerequisites: Rust 1.78+, Xcode Command Line Tools (Swift 5.10+),
 `cargo install cbindgen`.
 
+> If thermal readouts show `—` on a chip we don't have keys for yet,
+> run `cargo run --example list_thermal_sensors` and extend the
+> `TABLE` constant in `src/metrics/thermal.rs` with the sensor names
+> printed there.
+
 ## Run
 
 ```
@@ -54,15 +59,27 @@ Daily-rotated log at `~/Library/Logs/monitor-rs/monitor-rs.log`.
 
 After `./build.sh`, verify:
 
-- [ ] Status item shows `C XX G XX M XX` and updates ~4 times per second.
+- [ ] Menu-bar status rotates through 7 entries on a ~14 s loop:
+      `CPU N%` → `GPU N%` → `MEM N%` → `NET ↓X.X ↑Y.Y` → `DSK ↓X.X ↑Y.Y`
+      → `BAT N%[⚡]` → `TMP N°C`.
 - [ ] Clicking the status item shows a translucent popover anchored beneath it.
-- [ ] Popover shows three summary tiles (CPU / GPU / MEM) with sparklines and
-      a per-core grid under the CPU tile.
+- [ ] Popover row 1 shows three summary tiles (CPU / GPU / MEM) with
+      sparklines and a per-core grid under the CPU tile.
+- [ ] Popover row 2 shows two tiles (NET / DSK) with sparklines that
+      auto-scale to the recent peak.
 - [ ] Top processes section updates live.
 - [ ] CPU sparkline rises when running `yes > /dev/null` × N.
 - [ ] Per-core grid lights up redder with load.
 - [ ] GPU sparkline rises under a Metal compute load — or shows `n/a` if
       IOReport binding is unavailable.
+- [ ] Network rate rises when downloading:
+      `curl -o /dev/null https://speed.cloudflare.com/__down\?bytes\=20000000`.
+- [ ] Disk rate rises when writing:
+      `dd if=/dev/zero of=/tmp/iotest bs=1m count=500 && rm /tmp/iotest`.
+- [ ] Footer shows `🔋 N% [⚡]` when on a laptop; bolt drops when unplugged;
+      battery chip is hidden entirely on a desktop.
+- [ ] Footer shows `🌡 CPU N° GPU N°` (M-series only); under sustained CPU
+      load the CPU number rises faster than the GPU number.
 - [ ] Power icon in the header quits the app cleanly.
 - [ ] Light and Dark mode both look correct (toggle via System Settings →
       Appearance).
