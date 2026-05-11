@@ -10,23 +10,23 @@
 #include <stdint.h>
 #include <stddef.h>
 
-#if defined(MONITOR_RS_MACOS)
+#if defined(__APPLE__)
 #define MRS_MAX_CORES 64
 #endif
 
-#if defined(MONITOR_RS_MACOS)
+#if defined(__APPLE__)
 #define MRS_MAX_PROCS 16
 #endif
 
-#if defined(MONITOR_RS_MACOS)
+#if defined(__APPLE__)
 #define MRS_PROC_NAME 64
 #endif
 
-#if defined(MONITOR_RS_MACOS)
+#if defined(__APPLE__)
 typedef struct MrsHandle MrsHandle;
 #endif
 
-#if defined(MONITOR_RS_MACOS)
+#if defined(__APPLE__)
 typedef struct {
   uint32_t pid;
   char name[MRS_PROC_NAME];
@@ -35,7 +35,7 @@ typedef struct {
 } MrsProcInfo;
 #endif
 
-#if defined(MONITOR_RS_MACOS)
+#if defined(__APPLE__)
 typedef struct {
   double ts_seconds;
   float cpu_total_pct;
@@ -57,31 +57,31 @@ typedef struct {
 extern "C" {
 #endif // __cplusplus
 
-#if defined(MONITOR_RS_MACOS)
+#if defined(__APPLE__)
 MrsHandle *monitor_rs_start(void);
 #endif
 
-#if defined(MONITOR_RS_MACOS)
+#if defined(__APPLE__)
 void monitor_rs_stop(MrsHandle *h);
 #endif
 
-#if defined(MONITOR_RS_MACOS)
+#if defined(__APPLE__)
 int monitor_rs_latest(MrsHandle *h, MrsSample *out);
 #endif
 
-#if defined(MONITOR_RS_MACOS)
+#if defined(__APPLE__)
 uintptr_t monitor_rs_recent(MrsHandle *h, uintptr_t n, MrsSample *out);
 #endif
 
-#if defined(MONITOR_RS_MACOS)
+#if defined(__APPLE__)
 const char *monitor_rs_settings_get(MrsHandle *h);
 #endif
 
-#if defined(MONITOR_RS_MACOS)
+#if defined(__APPLE__)
 int monitor_rs_settings_set(MrsHandle *h, const char *json);
 #endif
 
-#if defined(MONITOR_RS_MACOS)
+#if defined(__APPLE__)
 void monitor_rs_string_free(const char *s);
 #endif
 

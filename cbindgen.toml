@@ -19,4 +19,4 @@ include = ["MrsHandle", "MrsSample", "MrsProcInfo"]
 parse_deps = false
 
 [defines]
-"target_os = macos" = "MONITOR_RS_MACOS"
+"target_os = macos" = "__APPLE__"
