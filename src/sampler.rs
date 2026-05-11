@@ -59,6 +59,10 @@ fn run_loop(
     let mut mem = MemSampler::new();
     let mut procs = ProcSampler::new(settings.top_n_procs);
     let mut gpu = GpuSampler::new();
+    let mut net = crate::metrics::net::NetSampler::new();
+    let mut disk = crate::metrics::disk::DiskSampler::new();
+    let battery = crate::metrics::battery::BatterySampler::new();
+    let thermal = crate::metrics::thermal::ThermalSampler::new();
 
     let interval = Duration::from_secs_f32(1.0 / settings.sample_rate_hz.max(0.1));
     let mut next = Instant::now();
@@ -86,6 +90,10 @@ fn run_loop(
         };
         let top = procs.tick().unwrap_or_default();
         let gpu_pct = gpu.tick().ok().flatten();
+        let net_io = net.tick();
+        let disk_io = disk.tick();
+        let battery_info = battery.tick();
+        let thermal_info = thermal.tick();
 
         let s = Sample {
             ts: Instant::now(),
@@ -95,6 +103,10 @@ fn run_loop(
             mem: mem_r.mem,
             swap: mem_r.swap,
             top_procs: top,
+            net: net_io,
+            disk: disk_io,
+            battery: battery_info,
+            thermal: thermal_info,
         };
         store.write().push(s);
     }
