@@ -10,9 +10,18 @@ let package = Package(
             path: "Sources/MonitorRSC",
             publicHeadersPath: "include"
         ),
+        .target(
+            name: "MonitorRSLogic",
+            path: "Sources/MonitorRSLogic"
+        ),
+        .testTarget(
+            name: "MonitorRSLogicTests",
+            dependencies: ["MonitorRSLogic"],
+            path: "Tests/MonitorRSLogicTests"
+        ),
         .executableTarget(
             name: "MonitorRSApp",
-            dependencies: ["MonitorRSC"],
+            dependencies: ["MonitorRSC", "MonitorRSLogic"],
             path: "Sources/MonitorRSApp",
             linkerSettings: [
                 .linkedLibrary("monitor_rs"),
