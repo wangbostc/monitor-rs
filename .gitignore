@@ -3,3 +3,4 @@
 /.DS_Store
 *.app
 /rust_out
+/.build
