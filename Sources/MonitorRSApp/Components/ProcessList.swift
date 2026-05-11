@@ -4,26 +4,38 @@ import MonitorRSC
 struct ProcessList: View {
     let procs: [MrsProcInfo]
 
+    /// Fixed pixel widths for the numeric columns. Choosing them once here
+    /// (rather than relying on `Grid`'s content-driven sizing) keeps the
+    /// CPU% / RSS columns at the same X position across re-sorts — the name
+    /// column absorbs whatever's left.
+    private static let cpuColumnWidth: CGFloat = 36
+    private static let rssColumnWidth: CGFloat = 52
+    private static let columnSpacing: CGFloat = 12
+
     var body: some View {
         if procs.isEmpty {
             Text("No process data")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         } else {
-            Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 4) {
+            VStack(alignment: .leading, spacing: 4) {
                 ForEach(Array(procs.enumerated()), id: \.offset) { _, p in
-                    GridRow {
+                    HStack(spacing: Self.columnSpacing) {
                         Text(truncate(p.nameString, max: 22))
-                            .font(.system(.caption, design: .default))
+                            .font(.caption)
                             .lineLimit(1)
+                            .truncationMode(.tail)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+
                         Text("\(Int(p.cpu_pct.rounded()))%")
-                            .font(.system(.caption, design: .default).monospacedDigit())
-                            .frame(minWidth: 36, alignment: .trailing)
+                            .font(.caption.monospacedDigit())
                             .foregroundStyle(.secondary)
+                            .frame(width: Self.cpuColumnWidth, alignment: .trailing)
+
                         Text(formatBytes(p.rss_bytes))
-                            .font(.system(.caption, design: .default).monospacedDigit())
-                            .frame(minWidth: 52, alignment: .trailing)
+                            .font(.caption.monospacedDigit())
                             .foregroundStyle(.secondary)
+                            .frame(width: Self.rssColumnWidth, alignment: .trailing)
                     }
                 }
             }
