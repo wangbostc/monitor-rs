@@ -4,3 +4,6 @@
 *.app
 /rust_out
 /.build
+/Resources/icon/AppIcon.png
+/Resources/icon/AppIcon.iconset/
+/Resources/icon/AppIcon.icns
