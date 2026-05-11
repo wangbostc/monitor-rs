@@ -7,6 +7,15 @@ edition = "2024"
 name = "monitor_rs"
 crate-type = ["staticlib", "rlib"]
 
+# Aggressive size + cross-crate inlining for the release static lib. Trims
+# the linked binary (which lives in our text pages and counts toward our
+# phys footprint). At the cost of slower clean release builds.
+[profile.release]
+lto = "fat"
+codegen-units = 1
+strip = "symbols"
+panic = "abort"
+
 [dependencies]
 anyhow = "1.0.102"
 directories = "6.0.0"
