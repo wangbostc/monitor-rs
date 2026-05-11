@@ -5,6 +5,8 @@ pub mod cpu;
 pub mod gpu;
 pub mod mem;
 #[cfg(target_os = "macos")]
+pub mod disk;
+#[cfg(target_os = "macos")]
 pub mod net;
 pub mod procs;
 
