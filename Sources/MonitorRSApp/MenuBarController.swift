@@ -33,10 +33,16 @@ final class MenuBarController {
             icon?.isTemplate = true  // tints with menu bar foreground (Light/Dark aware)
             button.image = icon
             button.imagePosition = .imageLeft
+            // Monospaced digits so the title doesn't shuffle as values tick.
+            button.font = Self.statusItemFont
             button.title = "—"  // narrow placeholder until first sample arrives
             button.target = self
             button.action = #selector(togglePopover(_:))
         }
+
+        // Lock the status item to the widest possible rotation entry so the
+        // popover anchor doesn't shift horizontally as the title rotates.
+        statusItem.length = Self.statusItemFixedLength
 
         tracing_log_startup()
         startRefreshLoop()
@@ -75,6 +81,24 @@ final class MenuBarController {
 
     /// Seconds each metric is shown before rotating to the next.
     private static let rotationPeriodSeconds: TimeInterval = 2.0
+
+    /// Monospaced-digit menu-bar font so digits don't shuffle as values tick.
+    private static let statusItemFont: NSFont = NSFont.monospacedDigitSystemFont(
+        ofSize: NSFont.menuBarFont(ofSize: 0).pointSize,
+        weight: .regular
+    )
+
+    /// Fixed pixel width for the status item, computed from the widest title
+    /// the rotation can produce ("NET ↓99.9 ↑99.9"). Locking the length keeps
+    /// the button frame stable so the popover anchor doesn't drift.
+    private static let statusItemFixedLength: CGFloat = {
+        let longest = "NET ↓99.9 ↑99.9"
+        let textWidth = (longest as NSString)
+            .size(withAttributes: [.font: statusItemFont]).width
+        let iconSlot: CGFloat = 22  // gauge symbol + a little breathing room
+        let edgePadding: CGFloat = 8
+        return ceil(iconSlot + textWidth + edgePadding)
+    }()
 
     /// Compact status text shown alongside the gauge icon. Rotates through
     /// CPU / GPU / MEM / NET / DSK / BAT / TMP so the item stays narrow enough

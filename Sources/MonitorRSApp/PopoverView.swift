@@ -24,9 +24,10 @@ struct PopoverView: View {
                     }
                 )
 
-                if model.hero == .cpu {
-                    CoreGrid(perCoreUsage: latest.perCoreUsage)
-                }
+                // Always rendered so the popover height stays constant as
+                // the hero swaps. The grid is small (~8 pt) so the extra row
+                // costs less than the visual jump from showing/hiding it.
+                CoreGrid(perCoreUsage: latest.perCoreUsage)
 
                 Divider()
 

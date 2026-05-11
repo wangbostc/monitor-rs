@@ -80,16 +80,22 @@ After `./build.sh`, verify:
 - [ ] Menu-bar status rotates through 7 entries on a ~14 s loop:
       `CPU N%` → `GPU N%` → `MEM N%` → `NET ↓X.X ↑Y.Y` → `DSK ↓X.X ↑Y.Y`
       → `BAT N%[⚡]` → `TMP N°C`.
+- [ ] The status item does NOT change width as the rotation cycles — the
+      button frame stays fixed for the widest entry's pixel width, and
+      neighbouring menu bar items do not visibly shift.
 - [ ] Clicking the status item shows a translucent popover anchored beneath it.
+      Re-opening the popover at any point in the rotation cycle anchors it at
+      the same X position.
 - [ ] Popover shows ONE large tinted hero card (CPU by default — green) with
       a big percentage, a meta line (`N-core · hot core M%`), and an area
       sparkline on the right.
 - [ ] Below the hero, four pills (GPU / MEM / NET / DSK) show their
       current values.
-- [ ] Per-core grid appears only when CPU is the hero, directly below the
-      pills.
+- [ ] Per-core grid is always visible, directly below the pills row,
+      regardless of which metric is hero.
 - [ ] Tapping a pill pins that metric as the new hero with a brief
-      fade-in. A small filled dot appears next to its label.
+      fade-in. A small filled dot appears next to its label. The popover
+      bottom edge does NOT move when the hero swaps.
 - [ ] Tapping the pinned hero unpins it; auto-promotion resumes.
 - [ ] Top processes section updates live.
 - [ ] Running `yes > /dev/null` × N keeps CPU as the hero (already #1).

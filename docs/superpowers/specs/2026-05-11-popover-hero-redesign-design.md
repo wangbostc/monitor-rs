@@ -17,7 +17,9 @@ demand.
 
 - No changes to the Rust sampling core, the C ABI, or `MrsSample`. Every datum
   the redesign renders is already exposed.
-- No changes to the menu bar status item; it keeps its 7-step rotation.
+- The menu bar status item keeps its 7-step rotation, but its pixel width is
+  now locked to the widest possible rotation entry (see "Status item width"
+  below) so the popover anchor doesn't drift each tick.
 - No settings sheet. The gear icon in the header stays as a disabled placeholder.
 - No new system permissions, no Dock icon, no window mode.
 
@@ -26,13 +28,33 @@ demand.
 1. **HeaderStrip** (existing) — wordmark + disabled gear + quit. Unchanged.
 2. **HeroCard** (new) — the currently-promoted metric, large.
 3. **PillsRow** (new) — the four non-hero metrics, each tappable to pin/unpin.
-4. **CoreGrid** (existing) — rendered *only when CPU is hero*. Otherwise omitted.
+4. **CoreGrid** (existing) — always rendered (see "Stability" below).
 5. **Top processes** (existing `ProcessList`, with section label) — unchanged.
 6. **FooterStrip** (existing) — `swap · battery · temps · sample rate`.
    Unchanged in v1; minor color polish if it falls out naturally.
 
-Width remains 300 pt. Height varies: ~340 pt with no core grid, ~380 pt with it.
-The popover is allowed to grow/shrink — NSPopover already handles that.
+Width remains 300 pt. Height is constant across hero swaps (the per-core grid
+is always present), so the popover's bottom edge doesn't shift as the hero
+rotates.
+
+### Stability
+
+Two visual jumpiness sources are explicitly fixed:
+
+- **Status item width**: `NSStatusItem.length` is locked to
+  `ceil(iconSlot + monospacedDigitWidth("NET ↓99.9 ↑99.9") + padding)`
+  using `NSFont.menuBarFont(ofSize: 0).pointSize` for the monospaced-digit
+  font. This is computed once at init. The status item button frame never
+  changes width, so the popover anchor X never moves.
+- **Popover height**: the per-core grid is rendered for every hero, not just
+  CPU. The cost is ~14 pt of vertical space when CPU isn't the hero; the
+  benefit is a popover whose bottom edge never jumps.
+
+### Status item width
+
+The button uses `NSFont.monospacedDigitSystemFont(ofSize:weight:)` at menu
+bar font size so digits don't shuffle horizontally as values tick within a
+single category (e.g., 42% → 43%).
 
 ## Hero promotion logic
 
@@ -126,7 +148,9 @@ mode. Memory pressure overrides the MEM hue, matching the existing
 
 ### Per-core grid
 
-- Rendered immediately below the hero card *only when hero is CPU*.
+- Rendered immediately below the pills row, **always** — for every hero, not
+  just CPU. This is what keeps the popover height stable across hero swaps
+  (see "Stability" above).
 - Same `CoreGrid` view that ships today; no changes.
 
 ### Top processes
