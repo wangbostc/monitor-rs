@@ -3,9 +3,8 @@ import SwiftUI
 struct FooterStrip: View {
     let swapUsedBytes: UInt64
     let swapTotalBytes: UInt64
-    let sampleRateHz: Double
 
-    // New optional inputs — pass nil/false to hide.
+    // Optional inputs — pass nil/false to hide.
     let batteryPresent: Bool
     let batteryPct: Float
     let batteryCharging: Bool
@@ -36,10 +35,6 @@ struct FooterStrip: View {
             }
 
             Spacer()
-
-            Text("· \(rateText) ·")
-                .font(.caption)
-                .foregroundStyle(.tertiary)
         }
     }
 
@@ -59,11 +54,5 @@ struct FooterStrip: View {
         if let c = cpuTempC { parts.append("CPU \(Int(c.rounded()))°") }
         if let g = gpuTempC { parts.append("GPU \(Int(g.rounded()))°") }
         return "🌡 " + parts.joined(separator: " ")
-    }
-
-    private var rateText: String {
-        let rounded = (sampleRateHz * 10).rounded() / 10
-        if rounded == 1.0 { return "1 Hz" }
-        return String(format: "%.1f Hz", rounded)
     }
 }

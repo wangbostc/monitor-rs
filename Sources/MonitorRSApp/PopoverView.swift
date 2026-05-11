@@ -42,7 +42,6 @@ struct PopoverView: View {
                 FooterStrip(
                     swapUsedBytes: latest.swap_used_bytes,
                     swapTotalBytes: latest.swap_total_bytes,
-                    sampleRateHz: 1.0,
                     batteryPresent: latest.battery_present == 1,
                     batteryPct: latest.battery_pct,
                     batteryCharging: latest.battery_charging == 1,
