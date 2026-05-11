@@ -66,6 +66,14 @@ extension MrsSample {
         }
     }
 
+    var topProcessesByMem: [MrsProcInfo] {
+        let count = Int(proc_count_by_mem)
+        return withUnsafeBytes(of: procs_by_mem) { bytes -> [MrsProcInfo] in
+            let ptr = bytes.bindMemory(to: MrsProcInfo.self).baseAddress!
+            return Array(UnsafeBufferPointer(start: ptr, count: count))
+        }
+    }
+
     var gpuUsage: Float? {
         gpu_present == 1 ? gpu_pct : nil
     }

@@ -61,7 +61,13 @@ pub struct Sample {
     pub gpu_pct: Option<f32>,
     pub mem: MemInfo,
     pub swap: SwapInfo,
+    /// Top processes ranked by CPU usage (descending). Used as the default
+    /// list and the only meaningful sort for GPU / NET / DSK heros (per-process
+    /// data for those metrics is not available via public macOS APIs).
     pub top_procs: Vec<ProcInfo>,
+    /// Top processes ranked by resident memory (descending). Used when the
+    /// popover hero is MEM.
+    pub top_procs_by_mem: Vec<ProcInfo>,
     pub net: NetIo,
     pub disk: DiskIo,
     pub battery: BatteryInfo,

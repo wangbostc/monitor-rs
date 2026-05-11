@@ -31,11 +31,11 @@ struct PopoverView: View {
 
                 Divider()
 
-                Text("TOP PROCESSES")
+                Text(procListHeader)
                     .font(.system(.caption, design: .rounded).weight(.medium))
                     .tracking(0.5)
                     .foregroundStyle(.secondary)
-                ProcessList(procs: latest.topProcesses)
+                ProcessList(procs: procList(for: model.hero, sample: latest))
 
                 Divider()
 
@@ -95,5 +95,16 @@ struct PopoverView: View {
 
     private var swapAnimation: Animation? {
         reduceMotion ? nil : .snappy(duration: 0.22)
+    }
+
+    private var procListHeader: String {
+        // Only MEM has per-process data of its own. Every other hero uses
+        // the CPU-sorted list (per-process GPU / NET / DSK don't exist via
+        // public macOS APIs — see the design spec).
+        model.hero == .mem ? "TOP PROCESSES · BY MEM" : "TOP PROCESSES · BY CPU"
+    }
+
+    private func procList(for kind: MetricKind, sample: MrsSample) -> [MrsProcInfo] {
+        kind == .mem ? sample.topProcessesByMem : sample.topProcesses
     }
 }

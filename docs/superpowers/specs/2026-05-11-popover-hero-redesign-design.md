@@ -15,8 +15,11 @@ demand.
 
 ## Non-goals
 
-- No changes to the Rust sampling core, the C ABI, or `MrsSample`. Every datum
-  the redesign renders is already exposed.
+- ~~No changes to the Rust sampling core, the C ABI, or `MrsSample`.~~ The
+  top-processes-by-sort-key feature added later (see "Sampler-side support"
+  below) required adding `procs_by_mem` / `proc_count_by_mem` fields to
+  `MrsSample` and a second sort pass in `ProcSampler.tick()`. The change is
+  strictly additive and does not perturb existing fields.
 - The menu bar status item keeps its 7-step rotation, but its pixel width is
   now locked to the widest possible rotation entry (see "Status item width"
   below) so the popover anchor doesn't drift each tick.
@@ -155,9 +158,29 @@ mode. Memory pressure overrides the MEM hue, matching the existing
 
 ### Top processes
 
-- Reused as-is: `Text("TOP PROCESSES")` label (caption, tracked, secondary)
-  followed by `ProcessList`.
-- A `Divider` precedes it; a `Divider` precedes the footer.
+- Heading and list reflect the current hero's sort key:
+  - **CPU / GPU / NET / DSK hero** → "TOP PROCESSES · BY CPU", entries from
+    `sample.topProcesses` (Rust-side sorted by `cpu_pct` desc).
+  - **MEM hero** → "TOP PROCESSES · BY MEM", entries from
+    `sample.topProcessesByMem` (Rust-side sorted by `rss_bytes` desc).
+- Why not per-metric sort for GPU / NET / DSK: macOS does not expose
+  per-process GPU / network / disk throughput through any public API.
+  `proc_pid_rusage` exposes disk bytes and network packet counts, but only
+  for processes owned by the calling user — system daemons like
+  WindowServer / kernel_task would show zero, which is more misleading than
+  falling back to the CPU-sorted list. The fallback is documented in the
+  heading label so the user sees what list they're looking at.
+- A `Divider` precedes the heading; a `Divider` precedes the footer.
+- `ProcessList` row layout is unchanged: name · cpu_pct · rss_bytes.
+
+### Sampler-side support
+
+The Rust `ProcSampler.tick()` returns a `TopProcs { by_cpu, by_mem }` struct.
+Both lists are derived from the same `refresh_processes` snapshot, each
+sorted and truncated independently to `top_n_procs`. The FFI surface gains
+`procs_by_mem: [MrsProcInfo; MRS_MAX_PROCS]` and `proc_count_by_mem: u8`
+alongside the existing `procs` / `proc_count` fields. This is additive on
+the C-struct level — `MrsSample` grows but no existing field shifts.
 
 ### Footer
 

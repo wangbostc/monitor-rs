@@ -88,7 +88,10 @@ fn run_loop(
             Ok(r) => r,
             Err(e) => { tracing::warn!("mem tick: {e}"); continue; }
         };
-        let top = procs.tick().unwrap_or_default();
+        let top = procs.tick().unwrap_or_else(|_| crate::metrics::procs::TopProcs {
+            by_cpu: Vec::new(),
+            by_mem: Vec::new(),
+        });
         let gpu_pct = gpu.tick().ok().flatten();
         let net_io = net.tick();
         let disk_io = disk.tick();
@@ -102,7 +105,8 @@ fn run_loop(
             gpu_pct,
             mem: mem_r.mem,
             swap: mem_r.swap,
-            top_procs: top,
+            top_procs: top.by_cpu,
+            top_procs_by_mem: top.by_mem,
             net: net_io,
             disk: disk_io,
             battery: battery_info,

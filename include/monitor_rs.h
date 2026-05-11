@@ -61,6 +61,8 @@ typedef struct {
   float cpu_temp_c;
   uint8_t gpu_temp_present;
   float gpu_temp_c;
+  uint8_t proc_count_by_mem;
+  MrsProcInfo procs_by_mem[MRS_MAX_PROCS];
 } MrsSample;
 #endif
 

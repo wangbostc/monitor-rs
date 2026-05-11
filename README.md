@@ -97,7 +97,12 @@ After `./build.sh`, verify:
       fade-in. A small filled dot appears next to its label. The popover
       bottom edge does NOT move when the hero swaps.
 - [ ] Tapping the pinned hero unpins it; auto-promotion resumes.
-- [ ] Top processes section updates live.
+- [ ] Top processes section updates live. Heading reads
+      "TOP PROCESSES · BY CPU" by default. Pinning the MEM pill swaps the
+      list to processes sorted by resident memory and the heading changes
+      to "TOP PROCESSES · BY MEM" — the entries reorder visibly. Pinning
+      GPU / NET / DSK leaves the heading as "BY CPU" (no per-process
+      data for those metrics on macOS).
 - [ ] Running `yes > /dev/null` × N keeps CPU as the hero (already #1).
 - [ ] Per-core grid lights up redder with load.
 - [ ] GPU hero shows `n/a` / `Metal idle` if IOReport binding is unavailable;
