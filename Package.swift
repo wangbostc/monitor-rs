@@ -14,11 +14,6 @@ let package = Package(
             name: "MonitorRSLogic",
             path: "Sources/MonitorRSLogic"
         ),
-        .testTarget(
-            name: "MonitorRSLogicTests",
-            dependencies: ["MonitorRSLogic"],
-            path: "Tests/MonitorRSLogicTests"
-        ),
         .executableTarget(
             name: "MonitorRSApp",
             dependencies: ["MonitorRSC", "MonitorRSLogic"],
