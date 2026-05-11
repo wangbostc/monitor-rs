@@ -49,22 +49,24 @@ pub struct MrsSample {
 }
 
 pub struct MrsHandle {
+    #[allow(dead_code)]  // held for Drop: stops the sampler thread
     sampler: SamplerHandle,
     store: Arc<RwLock<SampleStore>>,
+    settings: parking_lot::RwLock<Settings>,
     start: std::time::Instant,
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn monitor_rs_start() -> *mut MrsHandle {
     let r = catch_unwind(|| {
-        let start = std::time::Instant::now();
         let settings = Settings::load();
-        let sampler = SamplerHandle::spawn(settings);
+        let sampler = SamplerHandle::spawn(settings.clone());
         let store = sampler.store.clone();
         Box::into_raw(Box::new(MrsHandle {
             sampler,
             store,
-            start,
+            settings: parking_lot::RwLock::new(settings),
+            start: std::time::Instant::now(),
         }))
     });
     r.unwrap_or(ptr::null_mut())
@@ -122,9 +124,10 @@ pub extern "C" fn monitor_rs_settings_get(h: *mut MrsHandle) -> *const c_char {
     if h.is_null() {
         return ptr::null();
     }
-    let r = catch_unwind(AssertUnwindSafe(|| {
-        let settings = Settings::load();
-        let json = serde_json::to_string(&settings).unwrap_or_else(|_| "{}".to_string());
+    let r = catch_unwind(AssertUnwindSafe(|| unsafe {
+        let handle = &*h;
+        let settings = handle.settings.read();
+        let json = serde_json::to_string(&*settings).unwrap_or_else(|_| "{}".to_string());
         let cstring = CString::new(json).unwrap_or_else(|_| CString::new("{}").unwrap());
         cstring.into_raw() as *const c_char
     }));
@@ -132,7 +135,7 @@ pub extern "C" fn monitor_rs_settings_get(h: *mut MrsHandle) -> *const c_char {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn monitor_rs_settings_set(_h: *mut MrsHandle, json: *const c_char) -> c_int {
+pub extern "C" fn monitor_rs_settings_set(h: *mut MrsHandle, json: *const c_char) -> c_int {
     if json.is_null() {
         return 0;
     }
@@ -141,6 +144,13 @@ pub extern "C" fn monitor_rs_settings_set(_h: *mut MrsHandle, json: *const c_cha
         let Ok(s) = cstr.to_str() else { return 0 };
         let Ok(settings) = serde_json::from_str::<Settings>(s) else { return 0 };
         if settings.save().is_err() { return 0 }
+        // Update in-memory copy too so a subsequent settings_get reflects the change.
+        // (Note: this doesn't restart the sampler; sample_rate_hz changes take effect
+        // on the next process launch. That's acceptable v1 behavior.)
+        if !h.is_null() {
+            let handle = &*h;
+            *handle.settings.write() = settings;
+        }
         1
     }));
     r.unwrap_or(0)
@@ -156,30 +166,31 @@ pub extern "C" fn monitor_rs_string_free(s: *const c_char) {
 }
 
 fn sample_to_c(s: &Sample, start: std::time::Instant) -> MrsSample {
-    let mut out = MrsSample {
-        ts_seconds: s.ts.checked_duration_since(start).unwrap_or_default().as_secs_f64(),
-        cpu_total_pct: s.cpu_total,
-        core_count: s.cpu_per_core.len().min(MRS_MAX_CORES) as u8,
-        cpu_per_core_pct: [0.0; MRS_MAX_CORES],
-        gpu_present: if s.gpu_pct.is_some() { 1 } else { 0 },
-        gpu_pct: s.gpu_pct.unwrap_or(0.0),
-        mem_used_bytes: s.mem.used_bytes,
-        mem_total_bytes: s.mem.total_bytes,
-        mem_pressure: match s.mem.pressure {
-            MemPressure::Normal => 0,
-            MemPressure::Warning => 1,
-            MemPressure::Critical => 2,
-        },
-        swap_used_bytes: s.swap.used_bytes,
-        swap_total_bytes: s.swap.total_bytes,
-        proc_count: s.top_procs.len().min(MRS_MAX_PROCS) as u8,
-        procs: [MrsProcInfo {
-            pid: 0,
-            name: [0; MRS_PROC_NAME],
-            cpu_pct: 0.0,
-            rss_bytes: 0,
-        }; MRS_MAX_PROCS],
+    // SAFETY: MrsSample is repr(C) with only Copy primitive fields and fixed-size
+    // arrays — all-zeros is a valid bit pattern. Using mem::zeroed() (rather than
+    // a struct literal) ensures the implicit C padding bytes are also zeroed so
+    // we don't leak indeterminate stack memory across the FFI boundary.
+    let mut out: MrsSample = unsafe { std::mem::zeroed() };
+
+    out.ts_seconds = s
+        .ts
+        .checked_duration_since(start)
+        .unwrap_or_default()
+        .as_secs_f64();
+    out.cpu_total_pct = s.cpu_total;
+    out.core_count = s.cpu_per_core.len().min(MRS_MAX_CORES) as u8;
+    out.gpu_present = if s.gpu_pct.is_some() { 1 } else { 0 };
+    out.gpu_pct = s.gpu_pct.unwrap_or(0.0);
+    out.mem_used_bytes = s.mem.used_bytes;
+    out.mem_total_bytes = s.mem.total_bytes;
+    out.mem_pressure = match s.mem.pressure {
+        MemPressure::Normal => 0,
+        MemPressure::Warning => 1,
+        MemPressure::Critical => 2,
     };
+    out.swap_used_bytes = s.swap.used_bytes;
+    out.swap_total_bytes = s.swap.total_bytes;
+    out.proc_count = s.top_procs.len().min(MRS_MAX_PROCS) as u8;
 
     for (dst, src) in out.cpu_per_core_pct.iter_mut().zip(s.cpu_per_core.iter()) {
         *dst = *src;
@@ -188,14 +199,14 @@ fn sample_to_c(s: &Sample, start: std::time::Instant) -> MrsSample {
         dst.pid = src.pid;
         dst.cpu_pct = src.cpu_pct;
         dst.rss_bytes = src.rss_bytes;
-        // Truncate name to NAME-1 bytes, NUL-terminate.
+        // Truncate name to NAME-1 bytes, NUL-terminate (the zero-init guarantees
+        // the trailing byte is already 0).
         let max = MRS_PROC_NAME - 1;
         let bytes = src.name.as_bytes();
         let n = bytes.len().min(max);
         for i in 0..n {
             dst.name[i] = bytes[i] as c_char;
         }
-        // remaining bytes are already 0 (default), so NUL termination is implicit
     }
 
     out
