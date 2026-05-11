@@ -19,7 +19,9 @@ final class MenuBarController {
         popover.behavior = .transient
         popover.animates = true
         popover.contentViewController = NSHostingController(
-            rootView: PopoverView(model: viewModel)
+            rootView: PopoverView(model: viewModel, onQuit: {
+                NSApp.terminate(nil)
+            })
         )
 
         if let button = statusItem.button {
