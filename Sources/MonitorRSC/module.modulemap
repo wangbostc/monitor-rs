@@ -1,0 +1,4 @@
+module MonitorRSC {
+    header "monitor_rs.h"
+    export *
+}

@@ -1,0 +1,23 @@
+// swift-tools-version: 5.10
+import PackageDescription
+
+let package = Package(
+    name: "MonitorRSApp",
+    platforms: [.macOS(.v14)],
+    targets: [
+        .target(
+            name: "MonitorRSC",
+            path: "Sources/MonitorRSC",
+            publicHeadersPath: "include"
+        ),
+        .executableTarget(
+            name: "MonitorRSApp",
+            dependencies: ["MonitorRSC"],
+            path: "Sources/MonitorRSApp",
+            linkerSettings: [
+                .linkedLibrary("monitor_rs"),
+                .unsafeFlags(["-L", "target/release"])
+            ]
+        )
+    ]
+)
