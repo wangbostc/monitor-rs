@@ -205,6 +205,24 @@ pub unsafe extern "C" fn monitor_rs_settings_set(h: *mut MrsHandle, json: *const
     r.unwrap_or(0)
 }
 
+/// Tell the sampler whether the popover is currently visible. When inactive,
+/// the sampler skips the expensive `sysinfo` process refresh and reuses the
+/// last-computed top-process lists. Pass non-zero for active, zero for
+/// inactive. Safe to call from any thread.
+///
+/// # Safety
+/// `h` must be a valid handle returned by `monitor_rs_start` and not yet freed.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn monitor_rs_set_active(h: *mut MrsHandle, active: u8) {
+    if h.is_null() {
+        return;
+    }
+    let _ = catch_unwind(AssertUnwindSafe(|| unsafe {
+        let handle = &*h;
+        handle.sampler.procs_active.store(active != 0, std::sync::atomic::Ordering::Relaxed);
+    }));
+}
+
 /// # Safety
 /// `s` must be a pointer previously returned by `monitor_rs_settings_get`, or null.
 /// After this call the pointer is invalid.

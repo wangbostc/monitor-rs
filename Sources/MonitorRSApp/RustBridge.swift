@@ -46,6 +46,12 @@ final class RustBridge {
             monitor_rs_settings_set(handle, cstr) == 1
         }
     }
+
+    /// Tell the sampler whether the popover is currently visible. When
+    /// inactive, the sampler skips the expensive process refresh.
+    func setActive(_ active: Bool) {
+        monitor_rs_set_active(handle, active ? 1 : 0)
+    }
 }
 
 /// Helpers for converting MrsSample C-array fields into Swift Arrays.

@@ -122,6 +122,19 @@ int monitor_rs_settings_set(MrsHandle *h, const char *json);
 
 #if defined(__APPLE__)
 /**
+ * Tell the sampler whether the popover is currently visible. When inactive,
+ * the sampler skips the expensive `sysinfo` process refresh and reuses the
+ * last-computed top-process lists. Pass non-zero for active, zero for
+ * inactive. Safe to call from any thread.
+ *
+ * # Safety
+ * `h` must be a valid handle returned by `monitor_rs_start` and not yet freed.
+ */
+void monitor_rs_set_active(MrsHandle *h, uint8_t active);
+#endif
+
+#if defined(__APPLE__)
+/**
  * # Safety
  * `s` must be a pointer previously returned by `monitor_rs_settings_get`, or null.
  * After this call the pointer is invalid.
