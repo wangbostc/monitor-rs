@@ -65,8 +65,7 @@ final class MenuBarController {
         guard let bridge = bridge else { return }
         let latest = bridge.latest()
         let recent = bridge.recent(120)
-        viewModel.latest = latest
-        viewModel.recent = recent
+        viewModel.refresh(latest: latest, recent: recent)
 
         if let s = latest {
             let index = Int(Date().timeIntervalSinceReferenceDate / Self.rotationPeriodSeconds) % 7
