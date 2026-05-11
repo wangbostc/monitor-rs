@@ -50,6 +50,17 @@ typedef struct {
   uint64_t swap_total_bytes;
   uint8_t proc_count;
   MrsProcInfo procs[MRS_MAX_PROCS];
+  uint64_t net_rx_bps;
+  uint64_t net_tx_bps;
+  uint64_t disk_read_bps;
+  uint64_t disk_write_bps;
+  uint8_t battery_present;
+  uint8_t battery_charging;
+  float battery_pct;
+  uint8_t cpu_temp_present;
+  float cpu_temp_c;
+  uint8_t gpu_temp_present;
+  float gpu_temp_c;
 } MrsSample;
 #endif
 

@@ -10,6 +10,7 @@ style = "type"
 [export]
 prefix = ""
 include = ["MrsHandle", "MrsSample", "MrsProcInfo"]
+exclude = ["IOPSCopyPowerSourcesInfo", "IOPSCopyPowerSourcesList", "IOPSGetPowerSourceDescription"]
 
 [export.rename]
 "c_char" = "char"
