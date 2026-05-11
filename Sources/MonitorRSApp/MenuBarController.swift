@@ -25,11 +25,20 @@ final class MenuBarController {
         )
 
         if let button = statusItem.button {
-            button.title = "monitor-rs"
+            // SF Symbol icon stays visible even when menu bar is crowded
+            // (notched Mac with many items). Title text shows live numbers
+            // alongside it once samples arrive.
+            let icon = NSImage(systemSymbolName: "gauge.with.dots.needle.50percent",
+                               accessibilityDescription: "monitor-rs")
+            icon?.isTemplate = true  // tints with menu bar foreground (Light/Dark aware)
+            button.image = icon
+            button.imagePosition = .imageLeft
+            button.title = "—"  // narrow placeholder until first sample arrives
             button.target = self
             button.action = #selector(togglePopover(_:))
         }
 
+        tracing_log_startup()
         startRefreshLoop()
     }
 
@@ -64,8 +73,8 @@ final class MenuBarController {
         }
     }
 
-    /// Equivalent to the old Rust render_menu_bar with the default template
-    /// "C {cpu} G {gpu} M {mem}". Em-dash for GPU None.
+    /// Compact status text shown alongside the gauge icon.
+    /// Format: "CPU% GPU% MEM%" — em-dash for GPU None.
     static func formatStatus(_ s: MrsSample) -> String {
         let cpu = Int(s.cpu_total_pct.rounded())
         let gpu: String = s.gpu_present == 1 ? "\(Int(s.gpu_pct.rounded()))" : "—"
@@ -73,6 +82,27 @@ final class MenuBarController {
             guard s.mem_total_bytes > 0 else { return 0 }
             return Int((Double(s.mem_used_bytes) / Double(s.mem_total_bytes) * 100.0).rounded())
         }()
-        return "C \(cpu) G \(gpu) M \(memPct)"
+        return "\(cpu) \(gpu) \(memPct)"
+    }
+
+    /// Write a startup line to the rolling log so we can confirm the menu-bar
+    /// app actually launched (and from which bundle path).
+    private func tracing_log_startup() {
+        let logPath = ("~/Library/Logs/monitor-rs/" as NSString).expandingTildeInPath
+        let line = "\(Date()) menu bar app launched (status item created)\n"
+        let fm = FileManager.default
+        try? fm.createDirectory(atPath: logPath, withIntermediateDirectories: true)
+        let file = (logPath as NSString).appendingPathComponent("monitor-rs-swift.log")
+        if let data = line.data(using: .utf8) {
+            if fm.fileExists(atPath: file) {
+                if let handle = try? FileHandle(forWritingTo: URL(fileURLWithPath: file)) {
+                    handle.seekToEndOfFile()
+                    handle.write(data)
+                    try? handle.close()
+                }
+            } else {
+                try? data.write(to: URL(fileURLWithPath: file))
+            }
+        }
     }
 }
