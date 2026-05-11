@@ -69,7 +69,7 @@ final class MenuBarController {
         viewModel.recent = recent
 
         if let s = latest {
-            let index = Int(Date().timeIntervalSinceReferenceDate / Self.rotationPeriodSeconds) % 3
+            let index = Int(Date().timeIntervalSinceReferenceDate / Self.rotationPeriodSeconds) % 7
             statusItem.button?.title = MenuBarController.formatStatus(s, index: index)
         }
     }
@@ -78,22 +78,41 @@ final class MenuBarController {
     private static let rotationPeriodSeconds: TimeInterval = 2.0
 
     /// Compact status text shown alongside the gauge icon. Rotates through
-    /// CPU / GPU / MEM so the item stays narrow enough to fit right of the
-    /// camera notch on notched MacBook Pros.
+    /// CPU / GPU / MEM / NET / DSK / BAT / TMP so the item stays narrow enough
+    /// to fit right of the camera notch on notched MacBook Pros.
     static func formatStatus(_ s: MrsSample, index: Int) -> String {
-        switch index % 3 {
+        switch index % 7 {
         case 0:
             return "CPU \(Int(s.cpu_total_pct.rounded()))%"
         case 1:
             return s.gpu_present == 1
                 ? "GPU \(Int(s.gpu_pct.rounded()))%"
                 : "GPU —"
-        default:
+        case 2:
             let memPct = s.mem_total_bytes > 0
                 ? Int((Double(s.mem_used_bytes) / Double(s.mem_total_bytes) * 100.0).rounded())
                 : 0
             return "MEM \(memPct)%"
+        case 3:
+            return "NET ↓\(formatRateMB(s.net_rx_bps)) ↑\(formatRateMB(s.net_tx_bps))"
+        case 4:
+            return "DSK ↓\(formatRateMB(s.disk_read_bps)) ↑\(formatRateMB(s.disk_write_bps))"
+        case 5:
+            guard s.battery_present == 1 else { return "BAT —" }
+            let pct = Int(s.battery_pct.rounded())
+            return s.battery_charging == 1 ? "BAT \(pct)%⚡" : "BAT \(pct)%"
+        default: // 6
+            guard s.cpu_temp_present == 1 else { return "TMP —" }
+            return "TMP \(Int(s.cpu_temp_c.rounded()))°C"
         }
+    }
+
+    /// Format a bytes-per-second value as MB/s with one decimal, clamping to
+    /// "0.0" below 0.05 MB/s to avoid jitter.
+    private static func formatRateMB(_ bps: UInt64) -> String {
+        let mb = Double(bps) / (1024.0 * 1024.0)
+        if mb < 0.05 { return "0.0" }
+        return String(format: "%.1f", mb)
     }
 
     /// Write a startup line to the rolling log so we can confirm the menu-bar
