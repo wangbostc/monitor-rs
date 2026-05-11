@@ -8,7 +8,7 @@ use std::ffi::{c_char, CStr, CString};
 use std::os::raw::c_int;
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::ptr;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 use parking_lot::RwLock;
 
@@ -53,12 +53,25 @@ pub struct MrsHandle {
     sampler: SamplerHandle,
     store: Arc<RwLock<SampleStore>>,
     settings: parking_lot::RwLock<Settings>,
+    #[allow(dead_code)]  // held for Drop: flushes the log appender on shutdown
+    log_guard: Option<tracing_appender::non_blocking::WorkerGuard>,
     start: std::time::Instant,
 }
+
+static LOGGING_INIT: OnceLock<()> = OnceLock::new();
 
 #[unsafe(no_mangle)]
 pub extern "C" fn monitor_rs_start() -> *mut MrsHandle {
     let r = catch_unwind(|| {
+        // Initialize logging on the first call only; subsequent calls reuse the
+        // global subscriber. Only the first handle holds a WorkerGuard, which
+        // is kept alive until that handle is dropped.
+        let log_guard = if LOGGING_INIT.set(()).is_ok() {
+            Some(crate::logging::init())
+        } else {
+            None
+        };
+
         let settings = Settings::load();
         let sampler = SamplerHandle::spawn(settings.clone());
         let store = sampler.store.clone();
@@ -66,14 +79,18 @@ pub extern "C" fn monitor_rs_start() -> *mut MrsHandle {
             sampler,
             store,
             settings: parking_lot::RwLock::new(settings),
+            log_guard,
             start: std::time::Instant::now(),
         }))
     });
     r.unwrap_or(ptr::null_mut())
 }
 
+/// # Safety
+/// `h` must be a non-null pointer previously returned by `monitor_rs_start` and
+/// not yet freed. After this call the pointer is invalid.
 #[unsafe(no_mangle)]
-pub extern "C" fn monitor_rs_stop(h: *mut MrsHandle) {
+pub unsafe extern "C" fn monitor_rs_stop(h: *mut MrsHandle) {
     if h.is_null() {
         return;
     }
@@ -84,8 +101,11 @@ pub extern "C" fn monitor_rs_stop(h: *mut MrsHandle) {
     }));
 }
 
+/// # Safety
+/// `h` must be a valid handle returned by `monitor_rs_start` and not yet freed.
+/// `out` must point to a writable `MrsSample`-sized allocation.
 #[unsafe(no_mangle)]
-pub extern "C" fn monitor_rs_latest(h: *mut MrsHandle, out: *mut MrsSample) -> c_int {
+pub unsafe extern "C" fn monitor_rs_latest(h: *mut MrsHandle, out: *mut MrsSample) -> c_int {
     if h.is_null() || out.is_null() {
         return 0;
     }
@@ -99,8 +119,11 @@ pub extern "C" fn monitor_rs_latest(h: *mut MrsHandle, out: *mut MrsSample) -> c
     r.unwrap_or(0)
 }
 
+/// # Safety
+/// `h` must be a valid handle returned by `monitor_rs_start` and not yet freed.
+/// `out` must point to a writable array of at least `n` `MrsSample` elements.
 #[unsafe(no_mangle)]
-pub extern "C" fn monitor_rs_recent(h: *mut MrsHandle, n: usize, out: *mut MrsSample) -> usize {
+pub unsafe extern "C" fn monitor_rs_recent(h: *mut MrsHandle, n: usize, out: *mut MrsSample) -> usize {
     if h.is_null() || out.is_null() || n == 0 {
         return 0;
     }
@@ -119,8 +142,11 @@ pub extern "C" fn monitor_rs_recent(h: *mut MrsHandle, n: usize, out: *mut MrsSa
     r.unwrap_or(0)
 }
 
+/// # Safety
+/// `h` must be a valid handle returned by `monitor_rs_start` and not yet freed.
+/// The returned pointer must be freed with `monitor_rs_string_free`.
 #[unsafe(no_mangle)]
-pub extern "C" fn monitor_rs_settings_get(h: *mut MrsHandle) -> *const c_char {
+pub unsafe extern "C" fn monitor_rs_settings_get(h: *mut MrsHandle) -> *const c_char {
     if h.is_null() {
         return ptr::null();
     }
@@ -134,8 +160,12 @@ pub extern "C" fn monitor_rs_settings_get(h: *mut MrsHandle) -> *const c_char {
     r.unwrap_or(ptr::null())
 }
 
+/// # Safety
+/// `h` must be a valid handle returned by `monitor_rs_start` and not yet freed
+/// (may be null, in which case settings are saved but not reflected in the handle).
+/// `json` must be a valid NUL-terminated UTF-8 string.
 #[unsafe(no_mangle)]
-pub extern "C" fn monitor_rs_settings_set(h: *mut MrsHandle, json: *const c_char) -> c_int {
+pub unsafe extern "C" fn monitor_rs_settings_set(h: *mut MrsHandle, json: *const c_char) -> c_int {
     if json.is_null() {
         return 0;
     }
@@ -156,8 +186,11 @@ pub extern "C" fn monitor_rs_settings_set(h: *mut MrsHandle, json: *const c_char
     r.unwrap_or(0)
 }
 
+/// # Safety
+/// `s` must be a pointer previously returned by `monitor_rs_settings_get`, or null.
+/// After this call the pointer is invalid.
 #[unsafe(no_mangle)]
-pub extern "C" fn monitor_rs_string_free(s: *const c_char) {
+pub unsafe extern "C" fn monitor_rs_string_free(s: *const c_char) {
     if s.is_null() { return; }
     let _ = catch_unwind(AssertUnwindSafe(|| unsafe {
         // Reconstruct the CString to drop it.
@@ -204,8 +237,8 @@ fn sample_to_c(s: &Sample, start: std::time::Instant) -> MrsSample {
         let max = MRS_PROC_NAME - 1;
         let bytes = src.name.as_bytes();
         let n = bytes.len().min(max);
-        for i in 0..n {
-            dst.name[i] = bytes[i] as c_char;
+        for (i, b) in bytes.iter().enumerate().take(n) {
+            dst.name[i] = *b as c_char;
         }
     }
 
@@ -227,37 +260,37 @@ mod tests {
         std::thread::sleep(std::time::Duration::from_millis(2000));
 
         let mut out: MrsSample = unsafe { std::mem::zeroed() };
-        let got = monitor_rs_latest(h, &mut out);
+        let got = unsafe { monitor_rs_latest(h, &mut out) };
         assert_eq!(got, 1);
         assert!(out.cpu_total_pct >= 0.0 && out.cpu_total_pct <= 100.0);
         assert!(out.core_count >= 1);
         assert!(out.mem_total_bytes > 0);
 
-        monitor_rs_stop(h);
+        unsafe { monitor_rs_stop(h) };
     }
 
     #[test]
     fn null_handle_returns_zero() {
         let mut out: MrsSample = unsafe { std::mem::zeroed() };
-        assert_eq!(monitor_rs_latest(std::ptr::null_mut(), &mut out), 0);
-        assert_eq!(monitor_rs_recent(std::ptr::null_mut(), 5, &mut out), 0);
-        monitor_rs_stop(std::ptr::null_mut()); // must not crash
+        assert_eq!(unsafe { monitor_rs_latest(std::ptr::null_mut(), &mut out) }, 0);
+        assert_eq!(unsafe { monitor_rs_recent(std::ptr::null_mut(), 5, &mut out) }, 0);
+        unsafe { monitor_rs_stop(std::ptr::null_mut()) }; // must not crash
     }
 
     #[test]
     fn settings_round_trip() {
         let h = monitor_rs_start();
-        let json_ptr = monitor_rs_settings_get(h);
+        let json_ptr = unsafe { monitor_rs_settings_get(h) };
         assert!(!json_ptr.is_null());
         let json = unsafe { CStr::from_ptr(json_ptr).to_str().unwrap().to_string() };
-        monitor_rs_string_free(json_ptr);
+        unsafe { monitor_rs_string_free(json_ptr) };
         assert!(json.contains("sample_rate_hz"));
 
         // Set the same JSON back — should succeed.
         let cstring = CString::new(json).unwrap();
-        let rc = monitor_rs_settings_set(h, cstring.as_ptr());
+        let rc = unsafe { monitor_rs_settings_set(h, cstring.as_ptr()) };
         assert_eq!(rc, 1);
 
-        monitor_rs_stop(h);
+        unsafe { monitor_rs_stop(h) };
     }
 }

@@ -62,26 +62,57 @@ MrsHandle *monitor_rs_start(void);
 #endif
 
 #if defined(__APPLE__)
+/**
+ * # Safety
+ * `h` must be a non-null pointer previously returned by `monitor_rs_start` and
+ * not yet freed. After this call the pointer is invalid.
+ */
 void monitor_rs_stop(MrsHandle *h);
 #endif
 
 #if defined(__APPLE__)
+/**
+ * # Safety
+ * `h` must be a valid handle returned by `monitor_rs_start` and not yet freed.
+ * `out` must point to a writable `MrsSample`-sized allocation.
+ */
 int monitor_rs_latest(MrsHandle *h, MrsSample *out);
 #endif
 
 #if defined(__APPLE__)
+/**
+ * # Safety
+ * `h` must be a valid handle returned by `monitor_rs_start` and not yet freed.
+ * `out` must point to a writable array of at least `n` `MrsSample` elements.
+ */
 uintptr_t monitor_rs_recent(MrsHandle *h, uintptr_t n, MrsSample *out);
 #endif
 
 #if defined(__APPLE__)
+/**
+ * # Safety
+ * `h` must be a valid handle returned by `monitor_rs_start` and not yet freed.
+ * The returned pointer must be freed with `monitor_rs_string_free`.
+ */
 const char *monitor_rs_settings_get(MrsHandle *h);
 #endif
 
 #if defined(__APPLE__)
+/**
+ * # Safety
+ * `h` must be a valid handle returned by `monitor_rs_start` and not yet freed
+ * (may be null, in which case settings are saved but not reflected in the handle).
+ * `json` must be a valid NUL-terminated UTF-8 string.
+ */
 int monitor_rs_settings_set(MrsHandle *h, const char *json);
 #endif
 
 #if defined(__APPLE__)
+/**
+ * # Safety
+ * `s` must be a pointer previously returned by `monitor_rs_settings_get`, or null.
+ * After this call the pointer is invalid.
+ */
 void monitor_rs_string_free(const char *s);
 #endif
 
