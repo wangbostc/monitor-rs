@@ -1,25 +1,43 @@
 import SwiftUI
 import MonitorRSC
+import MonitorRSLogic
 
 struct PopoverView: View {
     @Bindable var model: MonitorViewModel
     let onQuit: () -> Void
+
+    @Environment(\.accessibilityVoiceOverEnabled) private var voiceoverEnabled
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HeaderStrip(onQuit: onQuit)
 
             if let latest = model.latest {
-                summaryGrid(latest: latest)
-                ioGrid(latest: latest)
-                CoreGrid(perCoreUsage: latest.perCoreUsage)
+                heroSection(latest: latest)
+
+                PillsRow(
+                    hero: model.hero,
+                    sample: latest,
+                    onPin: { kind in
+                        withAnimation(swapAnimation) { model.pin(kind) }
+                    }
+                )
+
+                if model.hero == .cpu {
+                    CoreGrid(perCoreUsage: latest.perCoreUsage)
+                }
+
                 Divider()
+
                 Text("TOP PROCESSES")
                     .font(.system(.caption, design: .rounded).weight(.medium))
                     .tracking(0.5)
                     .foregroundStyle(.secondary)
                 ProcessList(procs: latest.topProcesses)
+
                 Divider()
+
                 FooterStrip(
                     swapUsedBytes: latest.swap_used_bytes,
                     swapTotalBytes: latest.swap_total_bytes,
@@ -42,77 +60,40 @@ struct PopoverView: View {
         }
         .padding(14)
         .frame(width: 300)
-    }
-
-    @ViewBuilder
-    private func summaryGrid(latest: MrsSample) -> some View {
-        HStack(alignment: .top, spacing: 12) {
-            MetricTile(
-                label: "CPU",
-                value: "\(Int(latest.cpu_total_pct.rounded()))%",
-                color: .green,
-                history: normalize(model.cpuHistory)
-            )
-            MetricTile(
-                label: "GPU",
-                value: latest.gpuUsage.map { "\(Int($0.rounded()))%" } ?? "n/a",
-                color: .blue,
-                history: normalize(model.gpuHistory)
-            )
-            MetricTile(
-                label: "MEM",
-                value: "\(Int(memPct(latest).rounded()))%",
-                color: memColor(latest.mem_pressure),
-                history: normalize(model.memHistory)
-            )
+        .dynamicTypeSize(...DynamicTypeSize.xLarge)
+        .onAppear { model.voiceoverEnabled = voiceoverEnabled }
+        .onChange(of: voiceoverEnabled) { _, new in
+            model.voiceoverEnabled = new
         }
     }
 
     @ViewBuilder
-    private func ioGrid(latest: MrsSample) -> some View {
-        HStack(alignment: .top, spacing: 12) {
-            MetricTile(
-                label: "NET",
-                value: formatIO(rx: latest.net_rx_bps, tx: latest.net_tx_bps),
-                color: .teal,
-                history: normalizeIO(model.netHistory)
-            )
-            MetricTile(
-                label: "DSK",
-                value: formatIO(rx: latest.disk_read_bps, tx: latest.disk_write_bps),
-                color: .purple,
-                history: normalizeIO(model.diskHistory)
-            )
+    private func heroSection(latest: MrsSample) -> some View {
+        HeroCard(
+            kind: model.hero,
+            sample: latest,
+            history: history(for: model.hero),
+            isPinned: model.isHeroPinned,
+            onTap: {
+                guard model.isHeroPinned else { return }
+                withAnimation(swapAnimation) { model.unpinHero() }
+            }
+        )
+        .id(model.hero)
+        .transition(.opacity.combined(with: .scale(scale: 0.98)))
+    }
+
+    private func history(for kind: MetricKind) -> [Float] {
+        switch kind {
+        case .cpu:  return model.cpuHistory
+        case .gpu:  return model.gpuHistory
+        case .mem:  return model.memHistory
+        case .net:  return model.netHistory
+        case .disk: return model.diskHistory
         }
     }
 
-    private func formatIO(rx: UInt64, tx: UInt64) -> String {
-        let rxMB = Double(rx) / (1024.0 * 1024.0)
-        let txMB = Double(tx) / (1024.0 * 1024.0)
-        return String(format: "↓%.1f ↑%.1f", rxMB, txMB)
-    }
-
-    /// Auto-scale IO history into 0…1 against the max in the window
-    /// (with a floor of 1 MB/s so an idle window doesn't render full-scale noise).
-    private func normalizeIO(_ raw: [Float]) -> [Float] {
-        let peak = max(1.0, raw.max() ?? 0.0)
-        return raw.map { max(0, min(1, $0 / peak)) }
-    }
-
-    private func normalize(_ raw: [Float]) -> [Float] {
-        raw.map { max(0, min(1, $0 / 100)) }
-    }
-
-    private func memPct(_ s: MrsSample) -> Double {
-        guard s.mem_total_bytes > 0 else { return 0 }
-        return Double(s.mem_used_bytes) / Double(s.mem_total_bytes) * 100.0
-    }
-
-    private func memColor(_ pressure: UInt8) -> Color {
-        switch pressure {
-        case 0: return .orange
-        case 1: return Color(red: 0.95, green: 0.55, blue: 0.20)
-        default: return .red
-        }
+    private var swapAnimation: Animation? {
+        reduceMotion ? nil : .snappy(duration: 0.22)
     }
 }
